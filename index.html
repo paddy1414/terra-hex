@@ -304,6 +304,13 @@
       <button id="btn-roll-dice" class="btn-action w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/25">
         Roll Dice
       </button>
+      <div id="dice-stats" class="w-full hidden">
+        <div class="flex items-center justify-between gap-2 px-0.5 mb-1">
+          <span class="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Roll history</span>
+          <span id="dice-stats-count" class="text-[9px] text-slate-500"></span>
+        </div>
+        <div id="dice-stats-bars" class="flex items-end gap-[2px] h-12"></div>
+      </div>
     </div>
 
     <!-- Development Cards Hand -->
@@ -587,6 +594,22 @@
       <button id="btn-confirm-trade" disabled class="btn-action w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs uppercase tracking-wider">
         Execute Trade ⚖️
       </button>
+    </div>
+  </div>
+
+  <!-- DISCARD MODAL (a 7 was rolled) -->
+  <div id="modal-discard" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3">
+    <div class="glass-panel rounded-3xl w-full max-w-sm p-5 border border-rose-500/40 shadow-2xl space-y-3">
+      <div class="text-center">
+        <div class="text-3xl">🏴‍☠️</div>
+        <h3 id="discard-title" class="font-display font-bold text-lg text-white mt-1">Discard cards</h3>
+        <p id="discard-desc" class="text-xs text-slate-400 mt-1"></p>
+      </div>
+      <div id="discard-rows" class="space-y-1.5"></div>
+      <div class="flex gap-2 pt-1">
+        <button type="button" id="btn-auto-discard" class="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold">Auto-pick</button>
+        <button type="button" id="btn-confirm-discard" disabled class="btn-action flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs uppercase tracking-wider">Discard</button>
+      </div>
     </div>
   </div>
 
@@ -1043,6 +1066,9 @@ function broadcastGameState() {
     diceBag: state.diceBag,
     rollId: state.rollId,
     turnDeadline: state.turnDeadline,
+    discardQueue: state.discardQueue,
+    discardDeadline: state.discardDeadline,
+    rollHistory: state.rollHistory,
     gameOver: state.gameOver,
     hexSize: state.hexSize
   };
@@ -1097,6 +1123,9 @@ function applyRemoteState(remote) {
     diceBag: remote.diceBag || [],
     rollId: remote.rollId || 0,
     turnDeadline: remote.turnDeadline || null,
+    discardQueue: remote.discardQueue || [],
+    discardDeadline: remote.discardDeadline || null,
+    rollHistory: remote.rollHistory || [],
     gameOver: remote.gameOver,
     hexSize: remote.hexSize
   });
@@ -1321,7 +1350,7 @@ const state = {
     discardLimit: 7,
     turnSeconds: 90,
     friendlyRobber: true,
-    balancedDice: false,
+    balancedDice: true,
     balancedNumbers: true,
     hiddenHands: false
   },
@@ -1840,6 +1869,10 @@ function startNewGame() {
   state.animations.floatingTexts = [];
   state.animations.flyingCards = [];
   state.animations.hexPulses = [];
+  state.discardQueue = [];
+  state.discardDeadline = null;
+  state.rollHistory = [];
+  state.diceBag = [];
 
   document.getElementById('modal-victory').classList.add('hidden');
   document.getElementById('game-log').innerHTML = '';
@@ -2155,16 +2188,24 @@ function updateLargestArmy() {
 let diceAnimating = false;
 
 function drawDiceValues() {
-  if (state.config.balancedDice) {
-    // Balanced dice: draw from a shuffled "deck" of all 36 outcomes so results even out over time
-    if (!Array.isArray(state.diceBag) || state.diceBag.length < 6) {
-      const bag = [];
-      for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) bag.push([a, b]);
-      state.diceBag = shuffle(bag);
-    }
-    return state.diceBag.pop();
+  if (!state.config.balancedDice) {
+    return [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
   }
-  return [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
+  // Balanced dice: deal from a shuffled deck of all 36 outcomes (reshuffled before it runs low, so the
+  // end of the deck isn't predictable), and usually re-draw a total that has just come up, to break streaks.
+  if (!Array.isArray(state.diceBag) || state.diceBag.length <= 8) {
+    const bag = [];
+    for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) bag.push([a, b]);
+    state.diceBag = shuffle(bag);
+  }
+  let pick = state.diceBag.pop();
+  const recent = (state.rollHistory || []).slice(-3);
+  const repeats = recent.filter(t => t === pick[0] + pick[1]).length;
+  if (repeats && Math.random() < 0.4 + 0.25 * repeats) {
+    state.diceBag.splice(Math.floor(Math.random() * (state.diceBag.length - 1)), 0, pick);
+    pick = state.diceBag.pop();
+  }
+  return pick;
 }
 
 function showRollToast(total) {
@@ -2229,6 +2270,7 @@ function resolveRoll(d1, d2) {
   state.dice = [d1, d2];
   state.rollId = (state.rollId || 0) + 1;
   const total = d1 + d2;
+  state.rollHistory = [...(state.rollHistory || []), total];
   const curr = getCurrentPlayer();
 
   if (total === 7) {
@@ -2236,26 +2278,15 @@ function resolveRoll(d1, d2) {
     logEvent(`🏴‍☠️ Rolled a <strong>7!</strong> The Bandit has been summoned.`);
 
     const limit = state.config.discardLimit || 7;
-    state.players.forEach(p => {
-      const count = getTotalResources(p);
-      if (count > limit) {
-        const discardCount = Math.floor(count / 2);
-        for (let i = 0; i < discardCount; i++) {
-          const avail = RESOURCES.filter(r => p.resources[r] > 0);
-          if (avail.length > 0) {
-            const r = avail[Math.floor(Math.random() * avail.length)];
-            p.resources[r]--;
-          }
-        }
-        logEvent(`⚠️ <strong style="color:${p.color}">${p.name}</strong> discarded ${discardCount} cards to the Bandit (held ${count}, limit ${limit}).`);
-      }
-    });
-
+    // Everyone over the limit discards half, one player at a time in seat order
+    // (one at a time so two players' choices can never overwrite each other online)
+    const order = state.players.map((_, i) => (state.currentPlayerIdx + i) % state.players.length);
+    state.discardQueue = order
+      .map(id => state.players[id])
+      .filter(p => getTotalResources(p) > limit)
+      .map(p => ({ playerId: p.id, count: Math.floor(getTotalResources(p) / 2) }));
     state.robberReturnPhase = 'MAIN';
-    state.phase = 'MOVE_ROBBER';
-    updateUI();
-    if (mp.enabled) broadcastGameState();
-    if (curr.isAI && shouldRunAI()) aiTimeout(() => aiMoveRobber(curr), 600);
+    advanceDiscards();
     return;
   }
 
@@ -2369,6 +2400,140 @@ function checkVictoryCondition() {
   return false;
 }
 
+// -------------------- DISCARDING ON A 7 --------------------
+let discardSelection = {};
+let discardModalFor = null;
+
+function currentDiscard() {
+  return (state.phase === 'DISCARD' && state.discardQueue && state.discardQueue[0]) || null;
+}
+function isLocalDiscarder() {
+  const d = currentDiscard();
+  return Boolean(d && d.playerId === localSeat());
+}
+
+// AI keeps a balanced hand: drop from whatever it holds most of
+function aiChooseDiscard(p, count) {
+  const take = {};
+  const left = { ...p.resources };
+  for (let i = 0; i < count; i++) {
+    const r = RESOURCES.slice().sort((a, b) => left[b] - left[a])[0];
+    if (!left[r]) break;
+    left[r]--;
+    take[r] = (take[r] || 0) + 1;
+  }
+  return take;
+}
+
+function applyDiscard(playerId, take) {
+  const p = state.players[playerId];
+  let n = 0;
+  RESOURCES.forEach(r => {
+    const k = Math.min(take[r] || 0, p.resources[r]);
+    p.resources[r] -= k;
+    n += k;
+  });
+  const detail = RESOURCES.filter(r => take[r]).map(r => `${take[r]}${TERRAIN_META[r].icon}`).join(' ');
+  logEvent(`⚠️ <strong style="color:${p.color}">${p.name}</strong> discarded ${n} card${n === 1 ? '' : 's'} to the Bandit${p.isAI || p.id === localSeat() ? ` (${detail})` : ''}.`);
+}
+
+function advanceDiscards() {
+  while (state.discardQueue && state.discardQueue.length) {
+    const { playerId, count } = state.discardQueue[0];
+    const p = state.players[playerId];
+    if (p.isAI) {
+      applyDiscard(playerId, aiChooseDiscard(p, count));
+      state.discardQueue.shift();
+      continue;
+    }
+    // A human has to choose: wait for them
+    state.phase = 'DISCARD';
+    const secs = Number(state.config.turnSeconds) || 0;
+    state.discardDeadline = secs > 0 ? Date.now() + Math.max(20, Math.min(secs, 60)) * 1000 : null;
+    updateUI();
+    if (mp.enabled) broadcastGameState();
+    return;
+  }
+
+  // Everyone has discarded: on to the robber
+  state.discardQueue = [];
+  state.discardDeadline = null;
+  state.phase = 'MOVE_ROBBER';
+  updateUI();
+  if (mp.enabled) broadcastGameState();
+  const curr = getCurrentPlayer();
+  if (curr.isAI && shouldRunAI()) aiTimeout(() => aiMoveRobber(curr), 600);
+}
+
+function submitDiscard(take) {
+  const d = currentDiscard();
+  if (!d) return;
+  const total = RESOURCES.reduce((a, r) => a + (take[r] || 0), 0);
+  if (total !== d.count) return;
+  document.getElementById('modal-discard').classList.add('hidden');
+  discardModalFor = null;
+  applyDiscard(d.playerId, take);
+  state.discardQueue.shift();
+  advanceDiscards();
+}
+
+function openDiscardModal() {
+  const d = currentDiscard();
+  if (!d) return;
+  const key = `${state.rollId}|${d.playerId}`;
+  if (discardModalFor === key) return;
+  discardModalFor = key;
+  discardSelection = {};
+  renderDiscardModal();
+  document.getElementById('modal-discard').classList.remove('hidden');
+}
+
+function renderDiscardModal() {
+  const d = currentDiscard();
+  const p = d && state.players[d.playerId];
+  if (!p) return;
+  const chosen = RESOURCES.reduce((a, r) => a + (discardSelection[r] || 0), 0);
+  document.getElementById('discard-title').textContent = `Discard ${d.count} card${d.count === 1 ? '' : 's'}`;
+  document.getElementById('discard-desc').textContent =
+    `A 7 was rolled and you hold ${getTotalResources(p)} cards. Choose which ${d.count} to give up.`;
+  document.getElementById('discard-rows').innerHTML = RESOURCES.map(r => {
+    const meta = TERRAIN_META[r];
+    const have = p.resources[r];
+    const pick = discardSelection[r] || 0;
+    return `
+      <div class="flex items-center gap-3 p-2 rounded-xl bg-slate-900/80 border border-slate-800 ${have ? '' : 'opacity-40'}">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-b ${meta.cardBg} flex items-center justify-center text-lg">${meta.icon}</div>
+        <div class="flex-1">
+          <div class="text-xs font-bold text-white">${meta.resName}</div>
+          <div class="text-[10px] text-slate-400">You have ${have}</div>
+        </div>
+        <button type="button" class="step-btn" data-discard="${r}" data-dir="-1" ${pick > 0 ? '' : 'disabled'}>−</button>
+        <span class="w-6 text-center font-extrabold ${pick ? 'text-rose-300' : 'text-slate-500'}">${pick}</span>
+        <button type="button" class="step-btn" data-discard="${r}" data-dir="1" ${pick < have && chosen < d.count ? '' : 'disabled'}>+</button>
+      </div>`;
+  }).join('');
+  const btn = document.getElementById('btn-confirm-discard');
+  btn.disabled = chosen !== d.count;
+  btn.textContent = chosen === d.count ? `Discard ${d.count} cards` : `Selected ${chosen} / ${d.count}`;
+}
+
+document.getElementById('discard-rows').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-discard]');
+  if (!b || b.disabled) return;
+  const r = b.dataset.discard;
+  discardSelection[r] = Math.max(0, (discardSelection[r] || 0) + Number(b.dataset.dir));
+  renderDiscardModal();
+});
+document.getElementById('btn-confirm-discard').addEventListener('click', () => {
+  if (isLocalDiscarder()) submitDiscard(discardSelection);
+});
+document.getElementById('btn-auto-discard').addEventListener('click', () => {
+  const d = currentDiscard();
+  if (!d || !isLocalDiscarder()) return;
+  discardSelection = aiChooseDiscard(state.players[d.playerId], d.count);
+  renderDiscardModal();
+});
+
 // -------------------- FRIENDLY ROBBER --------------------
 function hexTouchesProtectedPlayer(hex, thiefId) {
   return state.vertices.some(v => v.owner !== null && v.owner !== thiefId && v.hexIds.includes(hex.id)
@@ -2444,9 +2609,30 @@ function autoFinishTurn() {
   step(0);
 }
 
+function tickDiscardTimer(el) {
+  const d = currentDiscard();
+  if (!state.discardDeadline) { el.classList.add('hidden'); return; }
+  const msLeft = state.discardDeadline - Date.now();
+  const secsLeft = Math.max(0, Math.ceil(msLeft / 1000));
+  el.classList.remove('hidden');
+  el.textContent = `⏱ ${Math.floor(secsLeft / 60)}:${String(secsLeft % 60).padStart(2, '0')}`;
+  const urgent = secsLeft <= 10;
+  el.classList.toggle('text-sky-300', !urgent);
+  el.classList.toggle('text-rose-300', urgent);
+  el.classList.toggle('timer-urgent', urgent);
+  if (isLocalDiscarder() && secsLeft <= 5 && secsLeft > 0 && lastTickSecond !== secsLeft) sfx.timerTick(secsLeft <= 3);
+  lastTickSecond = secsLeft;
+  const local = isLocalDiscarder();
+  if (msLeft <= 0 && (local || (mp.enabled && mp.isHost && msLeft < -5000))) {
+    if (local) sfx.timeUp();
+    submitDiscard(aiChooseDiscard(state.players[d.playerId], d.count));
+  }
+}
+
 function tickTurnTimer() {
   const el = document.getElementById('turn-timer');
   if (!el) return;
+  if (state.phase === 'DISCARD' && !state.gameOver) return tickDiscardTimer(el);
   const c = getCurrentPlayer();
   if (!state.turnDeadline || state.gameOver || !c || c.isAI) {
     el.classList.add('hidden');
@@ -3633,6 +3819,12 @@ function updateUI() {
       statusEl.innerHTML = `<strong style="color:${curr.color}">${curr.name}</strong>'s Turn — Roll the Dice!`;
     } else if (state.phase === 'MOVE_ROBBER') {
       statusEl.innerHTML = `🏴‍☠️ <strong style="color:${curr.color}">${curr.name}</strong>: Click a tile to move the Bandit!`;
+    } else if (state.phase === 'DISCARD') {
+      const d = currentDiscard();
+      const dp = d && state.players[d.playerId];
+      statusEl.innerHTML = isLocalDiscarder()
+        ? `🏴‍☠️ Choose <strong>${d.count}</strong> cards to discard`
+        : (dp ? `⏳ Waiting for <strong style="color:${dp.color}">${dp.name}</strong> to discard ${d.count} cards…` : 'Discarding…');
     } else if (state.phase === 'FREE_ROADS') {
       statusEl.innerHTML = `🛣️ Place ${state.freeRoadsLeft} free Road(s)`;
     } else if (state.phase === 'MAIN') {
@@ -3691,6 +3883,12 @@ function updateUI() {
 
   const isMyTurn = isLocalTurn();
   announceTurnIfNeeded();
+  if (isLocalDiscarder()) {
+    openDiscardModal();
+  } else if (discardModalFor) {
+    discardModalFor = null;
+    document.getElementById('modal-discard').classList.add('hidden');
+  }
   const isMain = isMyTurn && state.phase === 'MAIN';
 
   const rollBtn = document.getElementById('btn-roll-dice');
@@ -3728,6 +3926,8 @@ function updateUI() {
   const btnEndTurn = document.getElementById('btn-end-turn');
   if (btnEndTurn) btnEndTurn.disabled = !isMain;
 
+  renderDiceStats();
+
   const deckCount = document.getElementById('dev-deck-count');
   if (deckCount) deckCount.textContent = `${state.devDeck.length} left`;
 
@@ -3749,6 +3949,36 @@ function updateUI() {
       }).join('');
     }
   }
+}
+
+// Small chart of every total rolled this game vs. what fair dice would give on average
+function renderDiceStats() {
+  const box = document.getElementById('dice-stats');
+  const hist = state.rollHistory || [];
+  if (!box) return;
+  box.classList.toggle('hidden', hist.length === 0);
+  if (!hist.length) return;
+  const counts = {};
+  hist.forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+  const ways = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 5, 9: 4, 10: 3, 11: 2, 12: 1 };
+  const expected = (n) => hist.length * ways[n] / 36;
+  let max = 1;
+  for (let n = 2; n <= 12; n++) max = Math.max(max, counts[n] || 0, expected(n));
+  const last = hist[hist.length - 1];
+  document.getElementById('dice-stats-count').textContent = `${hist.length} roll${hist.length === 1 ? '' : 's'}`;
+  let html = '';
+  for (let n = 2; n <= 12; n++) {
+    const c = counts[n] || 0;
+    const h = Math.round((c / max) * 40);
+    const e = Math.round((expected(n) / max) * 40);
+    const color = n === 7 ? '#f87171' : (n === 6 || n === 8 ? '#fbbf24' : '#7dd3fc');
+    html += `<div class="relative flex-1 flex flex-col items-center justify-end h-full" title="${n}: rolled ${c}× (fair dice ≈ ${expected(n).toFixed(1)})">
+      <div class="absolute left-0 right-0 border-t border-dashed border-white/40" style="bottom:${e + 9}px"></div>
+      <div class="w-full rounded-t-sm ${n === last ? 'ring-1 ring-white' : ''}" style="height:${Math.max(c ? 2 : 0, h)}px;background:${color};opacity:${c ? 0.9 : 0.2}"></div>
+      <div class="text-[7px] leading-none mt-0.5 ${n === last ? 'text-white font-bold' : 'text-slate-500'}">${n}</div>
+    </div>`;
+  }
+  document.getElementById('dice-stats-bars').innerHTML = html;
 }
 
 function logEvent(htmlMsg) {
@@ -3856,7 +4086,7 @@ function showVictoryModal(winner) {
 const TIMER_STEPS = [0, 30, 45, 60, 90, 120, 180, 300];
 const RULES = [
   { key: 'friendlyRobber',  icon: '🛡️', name: 'Friendly Robber',  desc: "Can't rob players on 2 points or fewer" },
-  { key: 'balancedDice',    icon: '🎲', name: 'Balanced Dice',    desc: 'Rolls even out like a shuffled deck' },
+  { key: 'balancedDice',    icon: '🎲', name: 'Balanced Dice',    desc: 'Fewer streaks; results even out' },
   { key: 'balancedNumbers', icon: '⚖️', name: 'Balanced Numbers', desc: 'No 6s or 8s side by side' },
   { key: 'hiddenHands',     icon: '🙈', name: 'Hidden Hands',     desc: "Hide rivals' card counts" }
 ];
@@ -3973,7 +4203,7 @@ function syncSettingsUI() {
     const pct = ((r.value - r.min) / (r.max - r.min)) * 100;
     r.style.background = `linear-gradient(90deg, #f59e0b ${pct}%, #334155 ${pct}%)`;
   });
-  try { localStorage.setItem('terrahex_settings', JSON.stringify(cfg)); } catch (_) {}
+  try { localStorage.setItem('terrahex_settings_v2', JSON.stringify(cfg)); } catch (_) {}
   // In a room lobby, the host's choices are shared with everyone
   if (mp.enabled && mp.isHost && mp.roomCode && mp.backend && document.getElementById('modal-setup').offsetParent !== null) {
     clearTimeout(syncSettingsUI.pushTimer);
@@ -3998,7 +4228,7 @@ document.getElementById('range-discard').addEventListener('input', (e) => { stat
 
 // Restore last-used settings
 try {
-  const saved = JSON.parse(localStorage.getItem('terrahex_settings') || 'null');
+  const saved = JSON.parse(localStorage.getItem('terrahex_settings_v2') || 'null');
   if (saved && typeof saved === 'object') {
     const keep = ['mapType', 'playerCount', 'vpTarget', 'discardLimit', 'turnSeconds', 'friendlyRobber', 'balancedDice', 'balancedNumbers', 'hiddenHands', 'playerColor', 'playerName'];
     keep.forEach(k => { if (saved[k] !== undefined) state.config[k] = saved[k]; });
