@@ -204,6 +204,26 @@
     .rule-card.on { border-color: rgba(251, 191, 36, 0.8); background: rgba(245, 158, 11, 0.16); }
     .rule-card.on .rule-check { background: #f59e0b; color: #0f172a; border-color: #f59e0b; }
     #map-settings-section.locked { pointer-events: none; opacity: 0.55; }
+    .build-btn {
+      display: flex; align-items: center; gap: 10px; text-align: left;
+      min-height: 64px; padding: 8px 12px; border-radius: 14px;
+      background: rgba(30, 41, 59, 0.92); border: 1px solid rgba(71, 85, 105, 0.9);
+    }
+    .build-btn:not(:disabled):hover { background: rgba(51, 65, 85, 0.95); }
+    .build-btn:disabled { opacity: 1; filter: none; cursor: not-allowed; background: rgba(15, 23, 42, 0.85); }
+    .build-btn:disabled .build-icon, .build-btn:disabled .bname { opacity: 0.45; filter: grayscale(0.6); }
+    .build-btn.active { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.55); }
+    .build-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; position: relative; }
+    .pieces-left { position: absolute; top: -7px; right: -9px; min-width: 22px; height: 18px; padding: 0 5px; border-radius: 999px; background: #0f172a; border: 1px solid #475569; color: #e2e8f0; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+    .pieces-left.empty { border-color: #f43f5e; color: #fda4af; }
+    .cost-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px 1px 4px; border-radius: 8px; font-size: 12px; font-weight: 800; border: 1px solid; }
+    .cost-chip .ico { font-size: 15px; line-height: 1; }
+    .cost-chip.ok { background: rgba(16, 185, 129, 0.16); border-color: rgba(52, 211, 153, 0.55); color: #a7f3d0; }
+    .cost-chip.short { background: rgba(244, 63, 94, 0.14); border-color: rgba(251, 113, 133, 0.5); color: #fecdd3; }
+    .trade-tab { color: #cbd5e1; }
+    .trade-tab.active { background: #4f46e5; color: #fff; }
+    .offer-pop { animation: offerPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes offerPop { from { transform: translate(-50%, -8px) scale(0.92); opacity: 0; } to { transform: translate(-50%, 0) scale(1); opacity: 1; } }
     #map-settings-section.locked #input-player-name,
     #map-settings-section.locked .color-swatch { pointer-events: auto; }
 
@@ -268,7 +288,7 @@
   </header>
 
   <!-- Floating Status Banner & Activity Log (Left/Top-Center) -->
-  <div class="relative z-10 flex flex-col items-center pointer-events-none px-3">
+  <div class="fixed top-[78px] sm:top-[84px] inset-x-0 z-20 flex flex-col items-center pointer-events-none px-3">
     <div id="turn-banner" class="glass-panel rounded-full px-4 py-1.5 flex items-center gap-2.5 shadow-xl border-amber-400/30">
       <span id="turn-indicator-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
       <span id="turn-status-text" class="text-xs sm:text-sm font-semibold text-slate-100 tracking-wide">Welcome to Terra Hex! Configure your map to begin.</span>
@@ -277,7 +297,7 @@
   </div>
 
   <!-- Collapsible Activity Feed (Desktop Left) -->
-  <aside class="hidden lg:flex flex-col fixed left-4 top-24 bottom-36 w-64 z-10 pointer-events-none justify-end">
+  <aside class="hidden lg:flex flex-col fixed left-4 top-24 bottom-[290px] w-64 z-10 pointer-events-none justify-end">
     <div class="glass-panel rounded-2xl p-3 max-h-60 flex flex-col pointer-events-auto">
       <div class="flex items-center justify-between border-b border-slate-700/60 pb-1.5 mb-2">
         <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Chronicle Log</span>
@@ -313,6 +333,15 @@
       </div>
     </div>
 
+    <!-- Bank supply -->
+    <div id="bank-widget" class="glass-panel rounded-2xl p-2.5 w-44 pointer-events-auto">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-sky-300">🏦 Bank</span>
+        <span class="text-[9px] text-slate-500">cards left</span>
+      </div>
+      <div id="bank-counts" class="grid grid-cols-3 gap-1"></div>
+    </div>
+
     <!-- Development Cards Hand -->
     <div id="dev-cards-widget" class="glass-panel rounded-2xl p-2.5 w-44 pointer-events-auto">
       <div class="flex items-center justify-between mb-1.5">
@@ -329,66 +358,29 @@
   <footer class="relative z-10 px-2 pb-2 sm:px-5 sm:pb-4 flex flex-col items-center gap-2 pointer-events-none">
     <!-- Build & Trade Bar -->
     <div class="glass-panel rounded-2xl p-1.5 sm:p-2 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 pointer-events-auto max-w-full">
-      <!-- Build Road -->
-      <button id="btn-build-road" data-action="road" class="btn-action flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-left">
-        <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-bold text-sm">🛣️</div>
-        <div>
-          <div class="text-xs font-bold text-slate-100 leading-tight">Road</div>
-          <div class="text-[10px] text-slate-400 flex items-center gap-1">
-            <span title="Wood">🌲1</span><span title="Brick">🧱1</span>
-          </div>
-        </div>
-      </button>
+      <!-- Build buttons: icon, pieces left, and cost chips (green = you have it, red = short) -->
+      <button id="btn-build-road" data-action="road" class="btn-action build-btn"></button>
+      <button id="btn-build-settlement" data-action="settlement" class="btn-action build-btn"></button>
+      <button id="btn-build-city" data-action="city" class="btn-action build-btn"></button>
+      <button id="btn-buy-dev" class="btn-action build-btn"></button>
 
-      <!-- Build Settlement -->
-      <button id="btn-build-settlement" data-action="settlement" class="btn-action flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-left">
-        <div class="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 font-bold text-sm">🏠</div>
-        <div>
-          <div class="text-xs font-bold text-slate-100 leading-tight">Settlement</div>
-          <div class="text-[10px] text-slate-400 flex items-center gap-1">
-            <span>🌲1</span><span>🧱1</span><span>🐑1</span><span>🌾1</span>
-          </div>
-        </div>
-      </button>
-
-      <!-- Upgrade to City -->
-      <button id="btn-build-city" data-action="city" class="btn-action flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-left">
-        <div class="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-sky-300 font-bold text-sm">🏰</div>
-        <div>
-          <div class="text-xs font-bold text-slate-100 leading-tight">City</div>
-          <div class="text-[10px] text-slate-400 flex items-center gap-1">
-            <span>🌾2</span><span>⛰️3</span>
-          </div>
-        </div>
-      </button>
-
-      <!-- Buy Dev Card -->
-      <button id="btn-buy-dev" class="btn-action flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-left">
-        <div class="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 font-bold text-sm">📜</div>
-        <div>
-          <div class="text-xs font-bold text-slate-100 leading-tight">Dev Card</div>
-          <div class="text-[10px] text-slate-400 flex items-center gap-1">
-            <span>🐑1</span><span>🌾1</span><span>⛰️1</span>
-          </div>
-        </div>
-      </button>
-
-      <div class="h-7 w-px bg-slate-700/70 hidden sm:block"></div>
+      <div class="h-12 w-px bg-slate-700/70 hidden sm:block"></div>
 
       <!-- Maritime / Bank Trade -->
-      <button id="btn-open-trade" class="btn-action flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 border border-indigo-400/40 text-xs font-bold text-white shadow-md">
-        <span>⚖️</span>
+      <button id="btn-open-trade" class="btn-action flex flex-col items-center justify-center gap-0.5 px-4 py-2 min-h-[64px] rounded-xl bg-indigo-600/80 hover:bg-indigo-500 border border-indigo-400/40 text-xs font-bold text-white shadow-md">
+        <span class="text-xl leading-none">⚖️</span>
         <span>Trade</span>
       </button>
 
       <!-- End Turn -->
-      <button id="btn-end-turn" class="btn-action flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 text-xs font-extrabold uppercase tracking-wider shadow-lg shadow-emerald-500/20">
+      <button id="btn-end-turn" class="btn-action flex items-center gap-1.5 px-5 py-2 min-h-[64px] rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 text-sm font-extrabold uppercase tracking-wider shadow-lg shadow-emerald-500/20">
         <span>End Turn</span>
         <span>➔</span>
       </button>
     </div>
 
     <!-- Human Player Resource Cards Hand -->
+    <div id="hand-summary" class="hidden glass-panel rounded-full px-3 py-1 text-[11px] font-semibold text-slate-200 flex items-center gap-3 pointer-events-auto"></div>
     <div id="resource-hand" class="flex items-end justify-center gap-1.5 sm:gap-2.5 pointer-events-auto">
       <!-- Generated dynamically for Wood, Brick, Sheep, Wheat, Ore -->
     </div>
@@ -573,10 +565,35 @@
   <div id="modal-trade" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3">
     <div class="glass-panel rounded-3xl w-full max-w-md p-5 sm:p-6 border border-indigo-400/30 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-700/70 pb-3">
-        <h3 class="font-display font-bold text-lg text-white">Maritime & Bank Trade</h3>
+        <h3 class="font-display font-bold text-lg text-white">Trade</h3>
         <button id="btn-close-trade" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">✕ Close</button>
       </div>
 
+      <div class="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-slate-900/90 border border-slate-800">
+        <button type="button" id="tab-trade-players" class="trade-tab py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider">🤝 Players</button>
+        <button type="button" id="tab-trade-bank" class="trade-tab py-2 rounded-xl text-xs font-extrabold uppercase tracking-wider">🏦 Bank &amp; Harbours</button>
+      </div>
+
+      <div id="trade-pane-players" class="space-y-3">
+        <div>
+          <label class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">You give</label>
+          <div id="ptrade-give" class="grid grid-cols-5 gap-1.5"></div>
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">You want</label>
+          <div id="ptrade-want" class="grid grid-cols-5 gap-1.5"></div>
+        </div>
+        <div>
+          <label class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Offer to</label>
+          <div id="ptrade-targets" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <button type="button" id="btn-send-offer" disabled class="btn-action w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider">
+          Send Offer 🤝
+        </button>
+        <p class="text-[10px] text-slate-500 text-center">Players accept or decline, then you pick who to trade with.</p>
+      </div>
+
+      <div id="trade-pane-bank" class="hidden space-y-4">
       <div>
         <label class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">You Give (Check your ports)</label>
         <div id="trade-give-options" class="grid grid-cols-5 gap-2"></div>
@@ -594,8 +611,12 @@
       <button id="btn-confirm-trade" disabled class="btn-action w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs uppercase tracking-wider">
         Execute Trade ⚖️
       </button>
+      </div>
     </div>
   </div>
+
+  <!-- Live trade offer: proposer's status panel / recipient's accept-decline card -->
+  <div id="trade-offer-card" class="hidden fixed top-[122px] sm:top-[132px] z-40 w-[min(92vw,380px)] glass-panel rounded-2xl p-3.5 border border-emerald-400/40 shadow-2xl" style="left:50%;transform:translateX(-50%)"></div>
 
   <!-- DISCARD MODAL (a 7 was rolled) -->
   <div id="modal-discard" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3">
@@ -624,24 +645,76 @@
 
   <!-- 4. RULES & COSTS MODAL -->
   <div id="modal-rules" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3">
-    <div class="glass-panel rounded-3xl w-full max-w-lg p-5 sm:p-6 border border-slate-700 shadow-2xl space-y-4">
+    <div class="glass-panel rounded-3xl w-full max-w-2xl max-h-[90dvh] overflow-y-auto p-5 sm:p-6 border border-slate-700 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-700 pb-3">
-        <h3 class="font-display font-bold text-lg text-white">Terra Hex Rules & Costs</h3>
+        <h3 class="font-display font-bold text-lg text-white">How to Play Terra Hex</h3>
         <button id="btn-close-rules" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">✕ Close</button>
       </div>
-      <div class="space-y-3 text-xs text-slate-300">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-300 leading-relaxed">
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 sm:col-span-2">
+          <div class="font-bold text-amber-300 mb-1">🏆 Goal</div>
+          <p>Be the first to reach the points target (10 by default; set it in the setup screen) <strong>on your own turn</strong>. Hidden Victory Point cards count, so a rival can win with points you couldn't see.</p>
+        </div>
         <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-          <div class="font-bold text-amber-300 mb-1">Building Costs</div>
-          <ul class="space-y-1">
-            <li>🛣️ <strong>Road</strong>: 1 Wood, 1 Brick</li>
-            <li>🏠 <strong>Settlement</strong>: 1 Wood, 1 Brick, 1 Sheep, 1 Wheat (+1 VP)</li>
-            <li>🏰 <strong>City</strong>: 2 Wheat, 3 Ore (+2 VP, doubles resource yield)</li>
-            <li>📜 <strong>Dev Card</strong>: 1 Sheep, 1 Wheat, 1 Ore</li>
+          <div class="font-bold text-amber-300 mb-1">⭐ Victory Points</div>
+          <ul class="space-y-0.5">
+            <li>🏠 Settlement: <strong>1</strong></li>
+            <li>🏰 City: <strong>2</strong></li>
+            <li>👑 Longest Road: <strong>2</strong></li>
+            <li>⚔️ Largest Army: <strong>2</strong></li>
+            <li>🏛️ Grand Monument card: <strong>1</strong> each (kept secret)</li>
           </ul>
         </div>
         <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-          <div class="font-bold text-amber-300 mb-1">Victory & Ports</div>
-          <p>First player to reach the Target VP (default 10) wins the match. Build on coastal vertex dots with harbours to get 2:1 specialized trades or 3:1 general bank trades.</p>
+          <div class="font-bold text-amber-300 mb-1">🔨 Building Costs</div>
+          <ul class="space-y-0.5">
+            <li>🛣️ Road: 🌲 1, 🧱 1</li>
+            <li>🏠 Settlement: 🌲 1, 🧱 1, 🐑 1, 🌾 1</li>
+            <li>🏰 City: 🌾 2, ⛰️ 3 (upgrades a settlement; doubles its harvest)</li>
+            <li>📜 Dev Card: 🐑 1, 🌾 1, ⛰️ 1</li>
+          </ul>
+          <p class="mt-1 text-slate-400">Each player has 15 roads, 5 settlements and 4 cities. Upgrading to a city gives the settlement back. The bank holds 19 of each resource; if it can't pay everyone owed a resource on a roll, nobody gets that resource.</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">👑 Longest Road</div>
+          <p>Your longest <strong>unbroken</strong> chain of roads (branches don't add up). You need at least <strong>5</strong> to claim it. A tie doesn't take it from the current holder, and an opponent's settlement built on your road cuts it in two.</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">⚔️ Largest Army</div>
+          <p>The first to play <strong>3 Knights</strong> claims it. Someone else has to play <strong>more</strong> Knights than the holder to take it.</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">📜 Development Cards</div>
+          <p class="mb-1">25 cards: 14 Knights, 5 Grand Monuments, 2 each of Road Building, Year of Plenty and Monopoly.</p>
+          <ul class="space-y-0.5">
+            <li>⚔️ <strong>Knight</strong>: move the Bandit and steal a card (can be played before rolling)</li>
+            <li>🛣️ <strong>Road Building</strong>: place 2 free roads</li>
+            <li>🌽 <strong>Year of Plenty</strong>: take any 2 resources</li>
+            <li>💰 <strong>Monopoly</strong>: take every card of one resource from all rivals</li>
+            <li>🏛️ <strong>Grand Monument</strong>: +1 VP, never played</li>
+          </ul>
+          <p class="mt-1 text-slate-400">You can play one card per turn, and not on the turn you bought it.</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">🏴‍☠️ Rolling a 7</div>
+          <p>Nobody harvests. Everyone holding more cards than the discard limit (7 by default) chooses half of them to discard (rounded down). Then the roller moves the Bandit to a new tile, which blocks its harvest, and steals 1 random card from a player next to it. With <strong>Friendly Robber</strong> on, players with 2 points or fewer can't be targeted.</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">🔄 A Turn</div>
+          <ol class="list-decimal list-inside space-y-0.5">
+            <li>Roll: every tile with that number pays its neighbours (1 per settlement, 2 per city)</li>
+            <li>Trade with the bank or your harbours</li>
+            <li>Build and play up to one dev card, in any order</li>
+            <li>End your turn</li>
+          </ol>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">🏗️ Placement</div>
+          <p>Settlements need at least one empty corner between them and any other building (the distance rule). After setup, new settlements must touch one of your roads, and roads must connect to your roads or buildings. Setup goes in snake order (1→4, then 4→1), and your second settlement pays out its neighbouring tiles.</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">⚖️ Trading</div>
+          <p>Bank: 4 of one resource for 1 of any other. A <strong>3:1</strong> harbour lowers that to 3 of anything, and a <strong>2:1</strong> harbour to 2 of its pictured resource. You need a settlement or city on the harbour's corner.</p>
         </div>
       </div>
     </div>
@@ -836,6 +909,12 @@ const firebaseBackend = {
     return { ...data, members };
   },
   async update(code, patch) {
+    if (patch.tradeResponse) {
+      const { offerId, playerId, answer } = patch.tradeResponse;
+      await fb.updateDoc(getRoomDocRef(code), { [`tradeResponses.${offerId}.${playerId}`]: answer });
+      return {};
+    }
+    if (patch.snapshotJson === undefined) { await fb.updateDoc(getRoomDocRef(code), patch); return {}; }
     const syncVersion = mp.lastSyncVersion + 1;
     await fb.updateDoc(getRoomDocRef(code), { ...patch, syncVersion });
     return { syncVersion };
@@ -974,6 +1053,9 @@ function subscribeToRoom(code) {
   mp.unsub = mp.backend.subscribe(code, (data) => {
     mp.members = data.members || [];
     mp.isHost = data.hostUid === mp.localUid;
+    const prevResponses = JSON.stringify(mp.tradeResponses || {});
+    mp.tradeResponses = data.tradeResponses || {};
+    if (prevResponses !== JSON.stringify(mp.tradeResponses)) renderTradeOfferCard();
     renderLobbyRoster();
     const settingsSection = document.getElementById('map-settings-section');
     settingsSection.classList.toggle('locked', !mp.isHost);
@@ -1066,6 +1148,8 @@ function broadcastGameState() {
     diceBag: state.diceBag,
     rollId: state.rollId,
     turnDeadline: state.turnDeadline,
+    winnerId: state.winnerId,
+    tradeOffer: state.tradeOffer || null,
     discardQueue: state.discardQueue,
     discardDeadline: state.discardDeadline,
     rollHistory: state.rollHistory,
@@ -1123,6 +1207,8 @@ function applyRemoteState(remote) {
     diceBag: remote.diceBag || [],
     rollId: remote.rollId || 0,
     turnDeadline: remote.turnDeadline || null,
+    winnerId: remote.winnerId ?? null,
+    tradeOffer: remote.tradeOffer || null,
     discardQueue: remote.discardQueue || [],
     discardDeadline: remote.discardDeadline || null,
     rollHistory: remote.rollHistory || [],
@@ -1151,7 +1237,7 @@ function applyRemoteState(remote) {
   updateUI();
 
   if (state.gameOver) {
-    const winner = state.players.find(p => calculatePlayerVP(p, true) >= state.config.vpTarget) || state.players[0];
+    const winner = state.players[state.winnerId] || state.players.find(p => calculatePlayerVP(p, true) >= state.config.vpTarget) || state.players[0];
     showVictoryModal(winner);
   } else if (mp.isHost && getCurrentPlayer()?.isAI) {
     aiTimeout(runAITurn, 650);
@@ -1308,6 +1394,9 @@ const TERRAIN_META = {
   desert: { label: 'Desert',   resName: 'None',  icon: '🏜️', color1: '#d97706', color2: '#92400e', border: '#fbbf24', cardBg: 'from-amber-700 to-stone-900' },
   water:  { label: 'Sea',      resName: 'None',  icon: '🌊', color1: '#0369a1', color2: '#0c4a6e', border: '#38bdf8', cardBg: '' }
 };
+
+const PIECE_LIMITS = { road: 15, settlement: 5, city: 4 };
+const BANK_SIZE = 19; // of each resource
 
 const BUILD_COSTS = {
   road:       { wood: 1, brick: 1 },
@@ -1869,6 +1958,8 @@ function startNewGame() {
   state.animations.floatingTexts = [];
   state.animations.flyingCards = [];
   state.animations.hexPulses = [];
+  state.winnerId = null;
+  state.tradeOffer = null;
   state.discardQueue = [];
   state.discardDeadline = null;
   state.rollHistory = [];
@@ -1944,6 +2035,17 @@ function getCurrentPlayer() {
   return state.players[idx];
 }
 
+function piecesLeft(pid, type) {
+  if (type === 'road') return PIECE_LIMITS.road - state.edges.filter(e => e.owner === pid).length;
+  const built = state.vertices.filter(v => v.owner === pid && v.building === type).length;
+  return PIECE_LIMITS[type] - built;
+}
+
+// The bank holds 19 of each resource; whatever isn't in a player's hand is in the bank.
+function bankCount(r) {
+  return BANK_SIZE - state.players.reduce((a, p) => a + (p.resources[r] || 0), 0);
+}
+
 function canAfford(player, cost) {
   for (const [res, amt] of Object.entries(cost)) {
     if ((player.resources[res] || 0) < amt) return false;
@@ -1959,6 +2061,22 @@ function payCost(player, cost) {
 
 function getTotalResources(player) {
   return Object.values(player.resources).reduce((a, b) => a + b, 0);
+}
+
+function vpBreakdown(p, includeSecret) {
+  let settlements = 0, cities = 0;
+  state.vertices.forEach(v => {
+    if (v.owner !== p.id) return;
+    if (v.building === 'city') cities++; else settlements++;
+  });
+  const parts = [];
+  if (settlements) parts.push(`${settlements} settlement${settlements > 1 ? 's' : ''}`);
+  if (cities) parts.push(`${cities} cit${cities > 1 ? 'ies' : 'y'} (${cities * 2})`);
+  if (p.hasLongestRoad) parts.push('Longest Road (2)');
+  if (p.hasLargestArmy) parts.push('Largest Army (2)');
+  const secret = p.devCards.filter(c => c.type === 'vp').length;
+  if (includeSecret && secret) parts.push(`${secret} VP card${secret > 1 ? 's' : ''}`);
+  return parts.join(' + ') || 'no points yet';
 }
 
 function calculatePlayerVP(player, includeSecretVP = false) {
@@ -2093,7 +2211,7 @@ function placeSettlement(vertexId, playerId, isSetup) {
     // 2nd settlement grants initial starting resources from adjacent hexes
     v.hexIds.forEach(hId => {
       const h = state.hexes[hId];
-      if (h.terrain !== 'desert') {
+      if (h.terrain !== 'desert' && bankCount(h.terrain) > 0) {
         player.resources[h.terrain]++;
         sfx.collectResource();
         spawnFlyingResource(h, player, h.terrain);
@@ -2140,48 +2258,64 @@ function upgradeToCity(vertexId, playerId) {
   if (mp.enabled) broadcastGameState(state.phase);
 }
 
+// Longest continuous road: a chain of your own roads with no branch counted twice.
+// An opponent's settlement or city on a junction cuts the road there.
+function longestRoadLength(pid) {
+  const owned = state.edges.filter(e => e.owner === pid);
+  if (!owned.length) return 0;
+  const blocked = (vid) => {
+    const v = state.vertices[vid];
+    return v.owner !== null && v.owner !== pid;
+  };
+  const walk = (vid, used) => {
+    if (used.size > 0 && blocked(vid)) return 0;
+    let longest = 0;
+    for (const eid of state.vertices[vid].edgeIds) {
+      const e = state.edges[eid];
+      if (e.owner !== pid || used.has(eid)) continue;
+      used.add(eid);
+      longest = Math.max(longest, 1 + walk(e.v1 === vid ? e.v2 : e.v1, used));
+      used.delete(eid);
+    }
+    return longest;
+  };
+  const starts = new Set();
+  owned.forEach(e => { starts.add(e.v1); starts.add(e.v2); });
+  let best = 0;
+  starts.forEach(v => { best = Math.max(best, walk(v, new Set())); });
+  return best;
+}
+
+// Shared award logic: needs at least `min`; the current holder keeps it on a tie;
+// if the holder is overtaken by several players tied for the lead, nobody holds it.
+function awardBonus(flag, valueOf, min, claimMsg, lostMsg) {
+  const holder = state.players.find(p => p[flag]);
+  const best = Math.max(0, ...state.players.map(valueOf));
+  let next = null;
+  if (best >= min) {
+    if (holder && valueOf(holder) === best) next = holder;
+    else {
+      const leaders = state.players.filter(p => valueOf(p) === best);
+      if (leaders.length === 1) next = leaders[0];
+    }
+  }
+  if (next === holder) return;
+  state.players.forEach(p => { p[flag] = (p === next); });
+  if (next) logEvent(claimMsg(next));
+  else if (holder) logEvent(lostMsg(holder));
+}
+
 function updateLongestRoad() {
-  // Simplified longest road tracker
-  state.players.forEach(p => {
-    const pRoads = state.edges.filter(e => e.owner === p.id).length;
-    p.longestRoad = pRoads;
-  });
-
-  let maxR = 4;
-  let leaderId = null;
-  state.players.forEach(p => {
-    if (p.longestRoad > maxR) {
-      maxR = p.longestRoad;
-      leaderId = p.id;
-    }
-  });
-
-  state.players.forEach(p => {
-    const had = p.hasLongestRoad;
-    p.hasLongestRoad = (p.id === leaderId);
-    if (!had && p.hasLongestRoad) {
-      logEvent(`👑 <strong style="color:${p.color}">${p.name}</strong> claimed the Longest Road (+2 VP)!`);
-    }
-  });
+  state.players.forEach(p => { p.longestRoad = longestRoadLength(p.id); });
+  awardBonus('hasLongestRoad', p => p.longestRoad, 5,
+    p => `👑 <strong style="color:${p.color}">${p.name}</strong> holds the Longest Road (${p.longestRoad} long, +2 VP)!`,
+    p => `👑 <strong style="color:${p.color}">${p.name}</strong> lost the Longest Road — it's up for grabs.`);
 }
 
 function updateLargestArmy() {
-  let maxK = 2;
-  let leaderId = null;
-  state.players.forEach(p => {
-    if (p.knightsPlayed > maxK) {
-      maxK = p.knightsPlayed;
-      leaderId = p.id;
-    }
-  });
-
-  state.players.forEach(p => {
-    const had = p.hasLargestArmy;
-    p.hasLargestArmy = (p.id === leaderId);
-    if (!had && p.hasLargestArmy) {
-      logEvent(`⚔️ <strong style="color:${p.color}">${p.name}</strong> claimed the Largest Army (+2 VP)!`);
-    }
-  });
+  awardBonus('hasLargestArmy', p => p.knightsPlayed, 3,
+    p => `⚔️ <strong style="color:${p.color}">${p.name}</strong> holds the Largest Army (${p.knightsPlayed} knights, +2 VP)!`,
+    p => `⚔️ <strong style="color:${p.color}">${p.name}</strong> lost the Largest Army.`);
 }
 
 // -------------------- DICE (animated) --------------------
@@ -2290,20 +2424,40 @@ function resolveRoll(d1, d2) {
     return;
   }
 
-  let harvestedCount = 0;
+  // Work out what everyone is owed first, then pay from the bank.
+  // Official rule: if the bank can't cover a resource for everyone, nobody gets it
+  // (unless only one player is owed it, who then gets whatever is left).
+  const owed = {}; // resource -> { playerId -> { amount, hexes: [] } }
   state.hexes.forEach(h => {
     if (h.number === total && !h.hasRobber && h.terrain !== 'desert') {
       state.animations.hexPulses.push({ hexId: h.id, alpha: 1, color: TERRAIN_META[h.terrain].border });
       state.vertices.forEach(v => {
         if (v.owner !== null && v.hexIds.includes(h.id)) {
-          const owner = state.players[v.owner];
-          const yieldAmt = v.building === 'city' ? 2 : 1;
-          owner.resources[h.terrain] += yieldAmt;
-          harvestedCount += yieldAmt;
-          spawnFlyingResource(h, owner, h.terrain);
+          const bucket = (owed[h.terrain] = owed[h.terrain] || {});
+          const entry = (bucket[v.owner] = bucket[v.owner] || { amount: 0, hexes: [] });
+          entry.amount += v.building === 'city' ? 2 : 1;
+          entry.hexes.push(h);
         }
       });
     }
+  });
+  let harvestedCount = 0;
+  Object.entries(owed).forEach(([res, byPlayer]) => {
+    const ids = Object.keys(byPlayer);
+    const need = ids.reduce((a, id) => a + byPlayer[id].amount, 0);
+    const inBank = bankCount(res);
+    if (need > inBank && ids.length > 1) {
+      logEvent(`🏦 The bank is short of ${TERRAIN_META[res].resName} ${TERRAIN_META[res].icon}: nobody collects it this roll.`);
+      return;
+    }
+    ids.forEach(id => {
+      const owner = state.players[id];
+      const give = Math.min(byPlayer[id].amount, bankCount(res));
+      if (give <= 0) return;
+      owner.resources[res] += give;
+      harvestedCount += give;
+      byPlayer[id].hexes.forEach(h => spawnFlyingResource(h, owner, res));
+    });
   });
 
   if (harvestedCount > 0) sfx.collectResource();
@@ -2359,6 +2513,7 @@ function advanceTurn() {
   if (state.gameOver) return;
   state.buildMode = null;
   state.devPlayedThisTurn = false;
+  state.tradeOffer = null;
 
   if (state.phase === 'SETUP_SETTLEMENT' || state.phase === 'SETUP_ROAD') {
     state.setupStep++;
@@ -2379,6 +2534,7 @@ function advanceTurn() {
   }
 
   startTurnClock();
+  checkVictoryCondition(); // e.g. points gained on someone else's turn count once your turn starts
   updateUI();
   if (mp.enabled) broadcastGameState(state.phase);
   if (getCurrentPlayer().isAI && !state.gameOver && shouldRunAI()) {
@@ -2386,16 +2542,18 @@ function advanceTurn() {
   }
 }
 
+// You can only win on your own turn (hidden Victory Point cards count).
 function checkVictoryCondition() {
-  for (const p of state.players) {
-    const totalVP = calculatePlayerVP(p, true);
-    if (totalVP >= state.config.vpTarget) {
-      state.gameOver = true;
-      state.phase = 'GAME_OVER';
-      sfx.victory();
-      showVictoryModal(p);
-      return true;
-    }
+  const p = getCurrentPlayer();
+  if (!p || state.gameOver || String(state.phase).startsWith('SETUP')) return false;
+  if (calculatePlayerVP(p, true) >= state.config.vpTarget) {
+    state.gameOver = true;
+    state.phase = 'GAME_OVER';
+    state.winnerId = p.id;
+    state.turnDeadline = null;
+    sfx.victory();
+    showVictoryModal(p);
+    return true;
   }
   return false;
 }
@@ -2725,7 +2883,7 @@ function playDevCard(cardId) {
     state.freeRoadsLeft = 2;
     state.phase = 'FREE_ROADS';
     state.buildMode = 'road';
-    if (!state.edges.some(e => isValidRoadEdge(e, player.id, false))) {
+    if (piecesLeft(player.id, 'road') <= 0 || !state.edges.some(e => isValidRoadEdge(e, player.id, false))) {
       state.freeRoadsLeft = 0;
       state.phase = 'MAIN';
       state.buildMode = null;
@@ -2734,7 +2892,10 @@ function playDevCard(cardId) {
     updateUI();
   } else if (card.type === 'yearPlenty') {
     if (player.isAI) {
-      RESOURCES.slice(0, 2).forEach(r => player.resources[r]++);
+      for (let k = 0; k < 2; k++) {
+        const r = RESOURCES.slice().sort((a, b) => player.resources[a] - player.resources[b]).find(x => bankCount(x) > 0);
+        if (r) player.resources[r]++;
+      }
       logEvent(`🌽 <strong style="color:${player.color}">${player.name}</strong> played <strong>Year of Plenty</strong>!`);
       updateUI();
     } else {
@@ -2745,8 +2906,8 @@ function playDevCard(cardId) {
           logEvent(`🌽 <strong>${player.name}</strong> harvested ${res1} & ${res2} via Year of Plenty.`);
           updateUI();
           if (mp.enabled) broadcastGameState(state.phase);
-        });
-      });
+        }, true);
+      }, true);
     }
   } else if (card.type === 'monopoly') {
     const executeMonopoly = (res) => {
@@ -2853,7 +3014,7 @@ function runAITurn() {
       const ratio = getPlayerTradeRatio(ai.id, giveRes);
       if (ai.resources[giveRes] >= ratio + 1) {
         const needed = RESOURCES.reduce((a, b) => ai.resources[a] < ai.resources[b] ? a : b);
-        if (needed !== giveRes) {
+        if (needed !== giveRes && bankCount(needed) > 0) {
           ai.resources[giveRes] -= ratio;
           ai.resources[needed] += 1;
           logEvent(`⚖️ <strong style="color:${ai.color}">${ai.name}</strong> traded ${ratio} ${giveRes} for 1 ${needed}.`);
@@ -2861,7 +3022,7 @@ function runAITurn() {
       }
     }
 
-    if (canAfford(ai, BUILD_COSTS.city)) {
+    if (canAfford(ai, BUILD_COSTS.city) && piecesLeft(ai.id, 'city') > 0) {
       const ownSettlements = state.vertices.filter(v => v.owner === ai.id && v.building === 'settlement');
       if (ownSettlements.length > 0) {
         ownSettlements.sort((a, b) => scoreVertexForSettlement(b, ai) - scoreVertexForSettlement(a, ai));
@@ -2871,7 +3032,7 @@ function runAITurn() {
       }
     }
 
-    if (canAfford(ai, BUILD_COSTS.settlement)) {
+    if (canAfford(ai, BUILD_COSTS.settlement) && piecesLeft(ai.id, 'settlement') > 0) {
       const validV = state.vertices.filter(v => isValidSettlementVertex(v, ai.id, false));
       if (validV.length > 0) {
         validV.sort((a, b) => scoreVertexForSettlement(b, ai) - scoreVertexForSettlement(a, ai));
@@ -2884,7 +3045,7 @@ function runAITurn() {
     if (canAfford(ai, BUILD_COSTS.road)) {
       const validE = state.edges.filter(e => isValidRoadEdge(e, ai.id, false));
       const ownRoadsCount = state.edges.filter(e => e.owner === ai.id).length;
-      if (validE.length > 0 && ownRoadsCount < 11) {
+      if (validE.length > 0 && ownRoadsCount < 13 && piecesLeft(ai.id, 'road') > 0) {
         validE.sort((a, b) => {
           const scoreEdge = (e) => {
             const v1 = state.vertices[e.v1], v2 = state.vertices[e.v2];
@@ -2955,7 +3116,7 @@ function centerCamera() {
     maxY = Math.max(...pts.map(p => p.y)) + S * 1.6;
   }
   const w = window.innerWidth, h = window.innerHeight;
-  const topUi = 120, bottomUi = w < 640 ? 210 : 190;
+  const topUi = 135, bottomUi = w < 640 ? 320 : 285;
   const sideUi = w >= 1024 ? 300 : 20;
   const availW = Math.max(200, w - sideUi * 2);
   const availH = Math.max(200, h - topUi - bottomUi);
@@ -3695,7 +3856,7 @@ function handleBoardClick(clientX, clientY) {
     if (isValidRoadEdge(state.edges[state.hoveredEdge], me, false)) {
       placeRoad(state.hoveredEdge, me, true);
       state.freeRoadsLeft--;
-      const anyLeft = state.edges.some(e => isValidRoadEdge(e, me, false));
+      const anyLeft = piecesLeft(me, 'road') > 0 && state.edges.some(e => isValidRoadEdge(e, me, false));
       if (state.freeRoadsLeft <= 0 || !anyLeft) {
         state.freeRoadsLeft = 0;
         state.phase = 'MAIN';
@@ -3717,18 +3878,18 @@ function handleBoardClick(clientX, clientY) {
 
   if (state.phase === 'MAIN') {
     if (state.buildMode === 'settlement' && state.hoveredVertex !== null) {
-      if (isValidSettlementVertex(state.vertices[state.hoveredVertex], me, false) && canAfford(player, BUILD_COSTS.settlement)) {
+      if (isValidSettlementVertex(state.vertices[state.hoveredVertex], me, false) && canAfford(player, BUILD_COSTS.settlement) && piecesLeft(me, 'settlement') > 0) {
         state.buildMode = null;
         placeSettlement(state.hoveredVertex, me, false);
       }
     } else if (state.buildMode === 'city' && state.hoveredVertex !== null) {
       const v = state.vertices[state.hoveredVertex];
-      if (v.owner === me && v.building === 'settlement' && canAfford(player, BUILD_COSTS.city)) {
+      if (v.owner === me && v.building === 'settlement' && canAfford(player, BUILD_COSTS.city) && piecesLeft(me, 'city') > 0) {
         state.buildMode = null;
         upgradeToCity(state.hoveredVertex, me);
       }
     } else if (state.buildMode === 'road' && state.hoveredEdge !== null) {
-      if (isValidRoadEdge(state.edges[state.hoveredEdge], me, false) && canAfford(player, BUILD_COSTS.road)) {
+      if (isValidRoadEdge(state.edges[state.hoveredEdge], me, false) && canAfford(player, BUILD_COSTS.road) && piecesLeft(me, 'road') > 0) {
         state.buildMode = null;
         placeRoad(state.hoveredEdge, me, false);
       }
@@ -3842,8 +4003,10 @@ function updateUI() {
       const vp = calculatePlayerVP(p, p.id === localSeat());
       const isTurn = p.id === state.currentPlayerIdx;
       const cardCount = (state.config.hiddenHands && p.id !== localSeat()) ? '?' : getTotalResources(p);
+      const devHeld = p.devCards.filter(c => !c.played).length;
+      const tip = `${p.name}: ${vpBreakdown(p, p.id === localSeat())}`;
       return `
-        <div class="glass-panel rounded-2xl px-3 py-1.5 flex items-center gap-2.5 transition ${isTurn ? 'ring-2 ring-amber-400 scale-[1.03]' : 'opacity-80'}">
+        <div title="${tip}" class="glass-panel rounded-2xl px-3 py-1.5 flex items-center gap-2.5 transition ${isTurn ? 'ring-2 ring-amber-400 scale-[1.03]' : 'opacity-80'}">
           <div class="w-3.5 h-8 rounded-full shadow" style="background:${p.color}"></div>
           <div>
             <div class="flex items-center gap-1.5">
@@ -3853,14 +4016,34 @@ function updateUI() {
             </div>
             <div class="flex items-center gap-2 text-[10px] text-slate-300 mt-0.5">
               <span class="font-extrabold text-amber-300">${vp} VP</span>
-              <span>🃏 ${cardCount}</span>
-              <span>🛣️ ${p.longestRoad}</span>
-              <span>⚔️ ${p.knightsPlayed}</span>
+              <span title="Resource cards in hand">🃏 ${cardCount}</span>
+              <span title="Development cards held">📜 ${devHeld}</span>
+              <span title="Longest continuous road">🛣️ ${p.longestRoad}</span>
+              <span title="Knights played">⚔️ ${p.knightsPlayed}</span>
             </div>
           </div>
         </div>
       `;
     }).join('');
+  }
+
+  const summary = document.getElementById('hand-summary');
+  if (summary) {
+    const me = getLocalPlayer();
+    summary.classList.toggle('hidden', !me);
+    if (me) {
+      const total = getTotalResources(me);
+      const limit = state.config.discardLimit || 7;
+      const devHeld = me.devCards.filter(c => !c.played).length;
+      const myVP = calculatePlayerVP(me, true);
+      summary.innerHTML = `
+        <span>🃏 <strong class="text-white">${total}</strong> card${total === 1 ? '' : 's'} in hand</span>
+        <span class="text-slate-500">•</span>
+        <span>📜 ${devHeld} dev card${devHeld === 1 ? '' : 's'}</span>
+        <span class="text-slate-500">•</span>
+        <span>⭐ <strong class="text-amber-300">${myVP}</strong> / ${state.config.vpTarget} VP</span>
+        ${total > limit ? `<span class="px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300">⚠ Over ${limit}: a 7 makes you discard ${Math.floor(total / 2)}</span>` : ''}`;
+    }
   }
 
   const handEl = document.getElementById('resource-hand');
@@ -3897,36 +4080,16 @@ function updateUI() {
     rollBtn.classList.toggle('pulse-gold', !rollBtn.disabled);
   }
 
-  const btnRoad = document.getElementById('btn-build-road');
-  if (btnRoad) {
-    btnRoad.disabled = !(isMain && canAfford(human, BUILD_COSTS.road));
-    btnRoad.classList.toggle('ring-2', state.buildMode === 'road');
-    btnRoad.classList.toggle('ring-amber-400', state.buildMode === 'road');
-  }
+  renderBuildDock(human, isMain);
+  renderBank();
 
-  const btnSettle = document.getElementById('btn-build-settlement');
-  if (btnSettle) {
-    btnSettle.disabled = !(isMain && canAfford(human, BUILD_COSTS.settlement));
-    btnSettle.classList.toggle('ring-2', state.buildMode === 'settlement');
-    btnSettle.classList.toggle('ring-amber-400', state.buildMode === 'settlement');
-  }
-
-  const btnCity = document.getElementById('btn-build-city');
-  if (btnCity) {
-    const hasSettlement = state.vertices.some(v => v.owner === human.id && v.building === 'settlement');
-    btnCity.disabled = !(isMain && hasSettlement && canAfford(human, BUILD_COSTS.city));
-    btnCity.classList.toggle('ring-2', state.buildMode === 'city');
-    btnCity.classList.toggle('ring-amber-400', state.buildMode === 'city');
-  }
-
-  const btnBuyDev = document.getElementById('btn-buy-dev');
-  if (btnBuyDev) btnBuyDev.disabled = !(isMain && state.devDeck.length > 0 && canAfford(human, BUILD_COSTS.dev));
   const btnOpenTrade = document.getElementById('btn-open-trade');
   if (btnOpenTrade) btnOpenTrade.disabled = !isMain;
   const btnEndTurn = document.getElementById('btn-end-turn');
   if (btnEndTurn) btnEndTurn.disabled = !isMain;
 
   renderDiceStats();
+  renderTradeOfferCard();
 
   const deckCount = document.getElementById('dev-deck-count');
   if (deckCount) deckCount.textContent = `${state.devDeck.length} left`;
@@ -3981,6 +4144,55 @@ function renderDiceStats() {
   document.getElementById('dice-stats-bars').innerHTML = html;
 }
 
+const DOCK_ITEMS = [
+  { id: 'btn-build-road',       mode: 'road',       name: 'Road',       icon: '🛣️', tint: 'rgba(245,158,11,0.18)', cost: BUILD_COSTS.road },
+  { id: 'btn-build-settlement', mode: 'settlement', name: 'Settlement', icon: '🏠', tint: 'rgba(16,185,129,0.18)', cost: BUILD_COSTS.settlement },
+  { id: 'btn-build-city',       mode: 'city',       name: 'City',       icon: '🏰', tint: 'rgba(14,165,233,0.18)', cost: BUILD_COSTS.city },
+  { id: 'btn-buy-dev',          mode: 'dev',        name: 'Dev Card',   icon: '📜', tint: 'rgba(168,85,247,0.18)', cost: BUILD_COSTS.dev }
+];
+
+function renderBuildDock(human, isMain) {
+  DOCK_ITEMS.forEach(item => {
+    const btn = document.getElementById(item.id);
+    if (!btn) return;
+    const left = Math.max(0, item.mode === 'dev' ? state.devDeck.length : (human.id >= 0 ? piecesLeft(human.id, item.mode) : PIECE_LIMITS[item.mode]));
+    const missing = [];
+    const chips = Object.entries(item.cost).map(([r, n]) => {
+      const have = human.resources[r] || 0;
+      const ok = have >= n;
+      if (!ok) missing.push(`${n - have} ${TERRAIN_META[r].resName}`);
+      return `<span class="cost-chip ${ok ? 'ok' : 'short'}" title="${TERRAIN_META[r].resName}: need ${n}, you have ${have}"><span class="ico">${TERRAIN_META[r].icon}</span>${n}</span>`;
+    }).join('');
+    const affordable = !missing.length;
+    let canDo = isMain && affordable && left > 0;
+    if (item.mode === 'city') canDo = canDo && state.vertices.some(v => v.owner === human.id && v.building === 'settlement');
+    btn.disabled = !canDo;
+    btn.classList.toggle('active', state.buildMode === item.mode);
+    btn.title = left <= 0 ? (item.mode === 'dev' ? 'No development cards left' : `No ${item.name.toLowerCase()}s left to build`)
+      : affordable ? `Build ${item.name}` : `Need ${missing.join(', ')}`;
+    btn.innerHTML = `
+      <div class="build-icon" style="background:${item.tint}">${item.icon}
+        <span class="pieces-left ${left <= 0 ? 'empty' : ''}" title="${item.mode === 'dev' ? 'Cards left in the deck' : 'Pieces you have left'}">${left}</span>
+      </div>
+      <div>
+        <div class="bname text-sm font-bold text-slate-100 leading-tight mb-1">${item.name}</div>
+        <div class="flex items-center gap-1 flex-wrap">${chips}</div>
+      </div>`;
+  });
+}
+
+function renderBank() {
+  const el = document.getElementById('bank-counts');
+  if (!el) return;
+  el.innerHTML = RESOURCES.map(r => {
+    const n = bankCount(r);
+    const low = n <= 3;
+    return `<div class="rounded-lg bg-gradient-to-b ${TERRAIN_META[r].cardBg} border ${low ? 'border-rose-400' : 'border-white/15'} px-1 py-1 flex items-center justify-between" title="${TERRAIN_META[r].resName}: ${n} left in the bank">
+      <span class="text-sm leading-none">${TERRAIN_META[r].icon}</span><span class="text-[11px] font-extrabold ${low ? 'text-rose-200' : 'text-white'}">${n}</span></div>`;
+  }).join('') + `<div class="rounded-lg bg-gradient-to-b from-purple-700 to-indigo-950 border border-white/15 px-1 py-1 flex items-center justify-between" title="Development cards left">
+      <span class="text-sm leading-none">📜</span><span class="text-[11px] font-extrabold text-white">${state.devDeck.length}</span></div>`;
+}
+
 function logEvent(htmlMsg) {
   const logEl = document.getElementById('game-log');
   if (!logEl) return;
@@ -3993,10 +4205,227 @@ function logEvent(htmlMsg) {
 let selectedGive = null;
 let selectedReceive = null;
 
+// ==================== PLAYER-TO-PLAYER TRADING ====================
+// The offer lives in game state (written only by the proposer, who is the current player).
+// Answers travel separately (room "tradeResponses" online), so a responder never overwrites the game.
+let ptGive = {}, ptWant = {}, ptTarget = 'all';
+let localTradeResponses = {}; // offerId -> { playerId: 'accept' | 'decline' }
+let lastOfferSeen = null;
+
+function resourceList(bundle) {
+  return RESOURCES.filter(r => bundle[r]).map(r => `${bundle[r]}${TERRAIN_META[r].icon}`).join(' ') || 'nothing';
+}
+function bundleCount(b) { return RESOURCES.reduce((a, r) => a + (b[r] || 0), 0); }
+function hasBundle(p, b) { return RESOURCES.every(r => (p.resources[r] || 0) >= (b[r] || 0)); }
+
+function tradeResponsesFor(offer) {
+  if (!offer) return {};
+  const remote = mp.enabled ? ((mp.tradeResponses || {})[offer.id] || {}) : (localTradeResponses[offer.id] || {});
+  return { ...(offer.aiResponses || {}), ...remote };
+}
+
+// AI: values resources it is short of, refuses to feed a player close to winning
+function aiTradeAnswer(ai, offer) {
+  const proposer = state.players[offer.fromId];
+  if (!hasBundle(ai, offer.want)) return 'decline';
+  if (calculatePlayerVP(proposer) >= state.config.vpTarget - 2) return 'decline';
+  const worth = (r) => 1 + 1.5 / (1 + (ai.resources[r] || 0));
+  let gain = 0;
+  RESOURCES.forEach(r => {
+    gain += (offer.give[r] || 0) * worth(r);
+    gain -= (offer.want[r] || 0) * (worth(r) + 0.2);
+  });
+  return gain > 0.15 ? 'accept' : 'decline';
+}
+
+function sendTradeOffer() {
+  const me = getLocalPlayer();
+  if (!me || !isLocalTurn() || state.phase !== 'MAIN') return;
+  if (!bundleCount(ptGive) || !bundleCount(ptWant) || !hasBundle(me, ptGive)) return;
+  const targets = ptTarget === 'all'
+    ? state.players.filter(p => p.id !== me.id).map(p => p.id)
+    : [Number(ptTarget)];
+  const offer = {
+    id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    fromId: me.id,
+    give: { ...ptGive },
+    want: { ...ptWant },
+    to: targets,
+    aiResponses: {}
+  };
+  targets.forEach(id => {
+    const p = state.players[id];
+    if (p.isAI) offer.aiResponses[id] = aiTradeAnswer(p, offer);
+  });
+  state.tradeOffer = offer;
+  const who = targets.length > 1 ? 'everyone' : state.players[targets[0]].name;
+  logEvent(`🤝 <strong style="color:${me.color}">${me.name}</strong> offers ${resourceList(offer.give)} for ${resourceList(offer.want)} to ${who}.`);
+  document.getElementById('modal-trade').classList.add('hidden');
+  ptGive = {}; ptWant = {};
+  sfx.collectResource();
+  updateUI();
+  if (mp.enabled) broadcastGameState();
+}
+
+function cancelTradeOffer(silent = false) {
+  const offer = state.tradeOffer;
+  if (!offer) return;
+  state.tradeOffer = null;
+  if (!silent) logEvent('🤝 Trade offer withdrawn.');
+  updateUI();
+  if (mp.enabled) broadcastGameState();
+}
+
+function respondToTrade(answer) {
+  const offer = state.tradeOffer;
+  const me = localSeat();
+  if (!offer || !offer.to.includes(me)) return;
+  if (answer === 'accept' && !hasBundle(state.players[me], offer.want)) return;
+  if (mp.enabled) {
+    mp.tradeResponses = mp.tradeResponses || {};
+    mp.tradeResponses[offer.id] = { ...(mp.tradeResponses[offer.id] || {}), [me]: answer };
+    mp.backend.update(mp.roomCode, { tradeResponse: { offerId: offer.id, playerId: me, answer } }).catch(() => {});
+  } else {
+    localTradeResponses[offer.id] = { ...(localTradeResponses[offer.id] || {}), [me]: answer };
+  }
+  renderTradeOfferCard();
+}
+
+function executeTrade(partnerId) {
+  const offer = state.tradeOffer;
+  if (!offer || !isLocalTurn() || offer.fromId !== localSeat()) return;
+  const from = state.players[offer.fromId];
+  const partner = state.players[partnerId];
+  if (tradeResponsesFor(offer)[partnerId] !== 'accept') return;
+  if (!hasBundle(from, offer.give)) { logEvent("⚠️ You no longer have the cards you offered."); return; }
+  if (!hasBundle(partner, offer.want)) { logEvent(`⚠️ ${partner.name} no longer has those cards.`); return; }
+  RESOURCES.forEach(r => {
+    from.resources[r] += (offer.want[r] || 0) - (offer.give[r] || 0);
+    partner.resources[r] += (offer.give[r] || 0) - (offer.want[r] || 0);
+  });
+  state.tradeOffer = null;
+  sfx.claimLand();
+  logEvent(`🤝 <strong style="color:${from.color}">${from.name}</strong> traded ${resourceList(offer.give)} to <strong style="color:${partner.color}">${partner.name}</strong> for ${resourceList(offer.want)}.`);
+  updateUI();
+  if (mp.enabled) broadcastGameState();
+}
+
+function renderTradeOfferCard() {
+  const card = document.getElementById('trade-offer-card');
+  const offer = state.tradeOffer;
+  const me = localSeat();
+  if (!offer || state.gameOver || state.phase !== 'MAIN') {
+    card.classList.add('hidden');
+    lastOfferSeen = null;
+    return;
+  }
+  const from = state.players[offer.fromId];
+  const responses = tradeResponsesFor(offer);
+  const isProposer = offer.fromId === me;
+  const isRecipient = offer.to.includes(me);
+  if (!isProposer && !isRecipient) {
+    // Spectating someone else's offer: show a compact note
+    card.innerHTML = `<div class="text-xs text-slate-300 text-center">🤝 <strong style="color:${from.color}">${from.name}</strong> offers ${resourceList(offer.give)} for ${resourceList(offer.want)}</div>`;
+  } else if (isProposer) {
+    const rows = offer.to.map(id => {
+      const p = state.players[id];
+      const ans = responses[id];
+      const status = ans === 'accept'
+        ? `<button type="button" data-trade-with="${id}" class="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-extrabold">Trade ✓</button>`
+        : ans === 'decline' ? '<span class="text-[11px] text-rose-300 font-semibold">Declined</span>'
+        : '<span class="text-[11px] text-slate-400">Thinking…</span>';
+      return `<div class="flex items-center justify-between gap-2 py-1">
+        <span class="flex items-center gap-1.5 text-xs font-semibold text-white"><span class="w-2.5 h-2.5 rounded-full" style="background:${p.color}"></span>${p.name}</span>${status}</div>`;
+    }).join('');
+    card.innerHTML = `
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Your offer</span>
+        <button type="button" id="btn-cancel-offer" class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300">Withdraw</button>
+      </div>
+      <div class="text-xs text-slate-200 mb-2">Give <strong>${resourceList(offer.give)}</strong> → get <strong>${resourceList(offer.want)}</strong></div>
+      <div class="divide-y divide-slate-800">${rows}</div>`;
+  } else {
+    const mine = responses[me];
+    const canPay = hasBundle(state.players[me], offer.want);
+    card.innerHTML = `
+      <div class="text-[11px] font-bold uppercase tracking-wider text-emerald-300 mb-1">Trade offer from <span style="color:${from.color}">${from.name}</span></div>
+      <div class="grid grid-cols-2 gap-2 mb-2.5 text-center">
+        <div class="p-2 rounded-xl bg-emerald-500/10 border border-emerald-400/30"><div class="text-[10px] text-slate-400">You get</div><div class="text-sm font-bold">${resourceList(offer.give)}</div></div>
+        <div class="p-2 rounded-xl bg-rose-500/10 border border-rose-400/30"><div class="text-[10px] text-slate-400">You give</div><div class="text-sm font-bold">${resourceList(offer.want)}</div></div>
+      </div>
+      ${mine ? `<div class="text-center text-xs ${mine === 'accept' ? 'text-emerald-300' : 'text-rose-300'} font-semibold">${mine === 'accept' ? `Accepted — waiting for ${from.name}` : 'Declined'}</div>`
+        : `<div class="flex gap-2">
+            <button type="button" data-trade-answer="decline" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200">Decline</button>
+            <button type="button" data-trade-answer="accept" ${canPay ? '' : 'disabled'} class="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-extrabold text-white disabled:opacity-40">${canPay ? 'Accept' : "Can't afford"}</button>
+          </div>`}`;
+  }
+  if (card.classList.contains('hidden') || lastOfferSeen !== offer.id) {
+    card.classList.remove('hidden', 'offer-pop');
+    void card.offsetWidth;
+    card.classList.add('offer-pop');
+    if (isRecipient && lastOfferSeen !== offer.id) sfx.playTone(880, 'triangle', 0.18, 0.08, 1320);
+    lastOfferSeen = offer.id;
+  }
+}
+
+document.getElementById('trade-offer-card').addEventListener('click', (e) => {
+  const withBtn = e.target.closest('[data-trade-with]');
+  if (withBtn) return executeTrade(Number(withBtn.dataset.tradeWith));
+  const ans = e.target.closest('[data-trade-answer]');
+  if (ans && !ans.disabled) return respondToTrade(ans.dataset.tradeAnswer);
+  if (e.target.closest('#btn-cancel-offer')) cancelTradeOffer();
+});
+
+function renderPlayerTradePane() {
+  const me = getLocalPlayer();
+  if (!me) return;
+  const cell = (r, kind, val, max) => `
+    <div class="p-1.5 rounded-xl bg-slate-800/80 border ${val ? (kind === 'give' ? 'border-rose-400/60' : 'border-emerald-400/60') : 'border-slate-700'} text-center">
+      <div class="text-base leading-none">${TERRAIN_META[r].icon}</div>
+      ${kind === 'give' ? `<div class="text-[9px] text-slate-500">have ${me.resources[r]}</div>` : '<div class="text-[9px] text-slate-500">&nbsp;</div>'}
+      <div class="flex items-center justify-between mt-1">
+        <button type="button" data-pt="${kind}" data-r="${r}" data-dir="-1" class="w-5 h-5 rounded bg-slate-900 text-xs font-bold disabled:opacity-30" ${val > 0 ? '' : 'disabled'}>−</button>
+        <span class="text-xs font-extrabold ${val ? 'text-white' : 'text-slate-500'}">${val}</span>
+        <button type="button" data-pt="${kind}" data-r="${r}" data-dir="1" class="w-5 h-5 rounded bg-slate-900 text-xs font-bold disabled:opacity-30" ${val < max ? '' : 'disabled'}>+</button>
+      </div>
+    </div>`;
+  document.getElementById('ptrade-give').innerHTML = RESOURCES.map(r => cell(r, 'give', ptGive[r] || 0, (ptWant[r] ? 0 : me.resources[r]))).join('');
+  document.getElementById('ptrade-want').innerHTML = RESOURCES.map(r => cell(r, 'want', ptWant[r] || 0, ptGive[r] ? 0 : 9)).join('');
+  const others = state.players.filter(p => p.id !== me.id);
+  const chip = (val, label, color) => `<button type="button" data-pt-target="${val}" class="px-2.5 py-1 rounded-full border text-[11px] font-semibold flex items-center gap-1.5 ${String(ptTarget) === String(val) ? 'bg-indigo-600 border-white text-white' : 'bg-slate-800 border-slate-700 text-slate-300'}">${color ? `<span class="w-2 h-2 rounded-full" style="background:${color}"></span>` : ''}${label}</button>`;
+  document.getElementById('ptrade-targets').innerHTML = chip('all', 'Everyone') + others.map(p => chip(p.id, p.name, p.color)).join('');
+  document.getElementById('btn-send-offer').disabled = !(bundleCount(ptGive) && bundleCount(ptWant) && isLocalTurn() && state.phase === 'MAIN');
+}
+
+document.getElementById('trade-pane-players').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pt]');
+  if (b && !b.disabled) {
+    const bag = b.dataset.pt === 'give' ? ptGive : ptWant;
+    bag[b.dataset.r] = Math.max(0, (bag[b.dataset.r] || 0) + Number(b.dataset.dir));
+    return renderPlayerTradePane();
+  }
+  const t = e.target.closest('[data-pt-target]');
+  if (t) { ptTarget = t.dataset.ptTarget; renderPlayerTradePane(); }
+});
+document.getElementById('btn-send-offer').addEventListener('click', sendTradeOffer);
+
+function showTradeTab(which) {
+  document.getElementById('trade-pane-players').classList.toggle('hidden', which !== 'players');
+  document.getElementById('trade-pane-bank').classList.toggle('hidden', which !== 'bank');
+  document.getElementById('tab-trade-players').classList.toggle('active', which === 'players');
+  document.getElementById('tab-trade-bank').classList.toggle('active', which === 'bank');
+  if (which === 'players') renderPlayerTradePane(); else renderTradeModal();
+}
+document.getElementById('tab-trade-players').addEventListener('click', () => showTradeTab('players'));
+document.getElementById('tab-trade-bank').addEventListener('click', () => showTradeTab('bank'));
+
 function openTradeModal() {
   selectedGive = null;
   selectedReceive = null;
-  renderTradeModal();
+  ptGive = {};
+  ptWant = {};
+  if (state.tradeOffer) cancelTradeOffer(true); // making a new trade replaces any open offer
+  showTradeTab(state.players.length > 1 ? 'players' : 'bank');
   document.getElementById('modal-trade').classList.remove('hidden');
 }
 
@@ -4020,10 +4449,11 @@ function renderTradeModal() {
 
   recEl.innerHTML = RESOURCES.map(r => {
     const isSel = selectedReceive === r;
+    const left = bankCount(r);
     return `
-      <button type="button" onclick="selectTradeReceive('${r}')" class="p-2 rounded-xl border text-center transition ${isSel ? 'bg-emerald-600 border-white text-white' : 'bg-slate-800 border-slate-700 text-slate-200'}">
+      <button type="button" ${left > 0 ? `onclick="selectTradeReceive('${r}')"` : 'disabled'} title="${left} left in the bank" class="p-2 rounded-xl border text-center transition ${isSel ? 'bg-emerald-600 border-white text-white' : 'bg-slate-800 border-slate-700 text-slate-200'} disabled:opacity-35">
         <div class="text-lg">${TERRAIN_META[r].icon}</div>
-        <div class="text-[10px] font-bold mt-0.5">+1</div>
+        <div class="text-[10px] font-bold mt-0.5">+1 <span class="text-slate-400 font-normal">(${left})</span></div>
       </button>
     `;
   }).join('');
@@ -4044,7 +4474,7 @@ window.selectTradeGive = (r) => { selectedGive = r; renderTradeModal(); };
 window.selectTradeReceive = (r) => { selectedReceive = r; renderTradeModal(); };
 window.playDevCard = playDevCard;
 
-function openResourcePicker(title, desc, callback) {
+function openResourcePicker(title, desc, callback, fromBank = false) {
   document.getElementById('picker-title').textContent = title;
   document.getElementById('picker-desc').textContent = desc;
   const container = document.getElementById('picker-buttons');
@@ -4053,7 +4483,13 @@ function openResourcePicker(title, desc, callback) {
     const btn = document.createElement('button');
     btn.className = 'p-2.5 rounded-xl bg-slate-800 hover:bg-purple-700 border border-slate-700 text-center transition';
     btn.innerHTML = `<div class="text-xl">${TERRAIN_META[r].icon}</div><div class="text-[10px] font-bold mt-1">${TERRAIN_META[r].resName}</div>`;
+    if (fromBank && bankCount(r) <= 0) {
+      btn.disabled = true;
+      btn.classList.add('opacity-30', 'cursor-not-allowed');
+      btn.title = 'The bank has none left';
+    }
     btn.onclick = () => {
+      if (btn.disabled) return;
       document.getElementById('modal-resource-picker').classList.add('hidden');
       callback(r);
     };
@@ -4074,7 +4510,7 @@ function showVictoryModal(winner) {
         <span class="w-3 h-3 rounded-full" style="background:${p.color}"></span>
         <span class="font-bold text-sm text-white">${p.name}</span>
       </div>
-      <span class="font-extrabold text-amber-300 text-sm">${calculatePlayerVP(p, true)} VP</span>
+      <span class="text-right"><span class="font-extrabold text-amber-300 text-sm">${calculatePlayerVP(p, true)} VP</span><span class="block text-[10px] text-slate-400">${vpBreakdown(p, true)}</span></span>
     </div>
   `).join('');
 
@@ -4367,7 +4803,7 @@ document.getElementById('btn-confirm-trade').addEventListener('click', () => {
   if (!selectedGive || !selectedReceive || selectedGive === selectedReceive || !isLocalTurn()) return;
   const human = getLocalPlayer();
   const ratio = getPlayerTradeRatio(human.id, selectedGive);
-  if (human.resources[selectedGive] >= ratio) {
+  if (human.resources[selectedGive] >= ratio && bankCount(selectedReceive) > 0) {
     human.resources[selectedGive] -= ratio;
     human.resources[selectedReceive] += 1;
     sfx.collectResource();
