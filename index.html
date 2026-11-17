@@ -1,0 +1,4214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Terra Hex — Hexagonal Empire Strategy</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-ocean-deep: #0b192c;
+      --bg-ocean-mid: #132a46;
+      --panel-bg: rgba(15, 23, 42, 0.86);
+      --panel-border: rgba(255, 255, 255, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: radial-gradient(circle at 50% 45%, #17375e 0%, #0b192c 65%, #060e1a 100%);
+      color: #f8fafc;
+      height: 100dvh;
+      width: 100vw;
+    }
+
+    .font-display {
+      font-family: 'Cinzel', serif;
+    }
+
+    /* Glassmorphic tabletop panels */
+    .glass-panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+    }
+
+    /* Tactile Resource Cards */
+    .res-card {
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+    }
+    .res-card:hover {
+      transform: translateY(-8px) scale(1.04);
+      box-shadow: 0 14px 24px -6px rgba(0, 0, 0, 0.6);
+      z-index: 20;
+    }
+
+    /* Action Buttons */
+    .btn-action {
+      transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-action:not(:disabled):hover {
+      transform: translateY(-2px);
+      filter: brightness(1.1);
+    }
+    .btn-action:not(:disabled):active {
+      transform: translateY(1px) scale(0.97);
+    }
+    .btn-action:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+      filter: grayscale(0.5);
+    }
+
+    /* 3D-style Dice */
+    .dice-cube {
+      width: 48px;
+      height: 48px;
+      border-radius: 11px;
+      background: linear-gradient(145deg, #ffffff 0%, #e2e8f0 100%);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45), inset 0 -3px 0 #cbd5e1, inset 0 2px 2px #ffffff;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      padding: 6px;
+      gap: 2px;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .dice-rolling {
+      animation: diceThrow 0.34s linear infinite;
+    }
+    #die-2.dice-rolling { animation-duration: 0.29s; animation-direction: reverse; }
+    @keyframes diceThrow {
+      0%   { transform: translateY(0) rotate(0deg) scale(1); }
+      25%  { transform: translateY(-16px) rotate(90deg) scale(1.15); }
+      50%  { transform: translateY(-4px) rotate(180deg) scale(1.04); }
+      75%  { transform: translateY(-13px) rotate(270deg) scale(1.13); }
+      100% { transform: translateY(0) rotate(360deg) scale(1); }
+    }
+    .dice-landed { animation: diceLand 0.55s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes diceLand {
+      0%   { transform: scale(1.4) rotate(-14deg); }
+      55%  { transform: scale(0.9) rotate(5deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+    .dice-glow { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.95), 0 0 26px rgba(251, 191, 36, 0.65), 0 6px 14px rgba(0,0,0,0.45); }
+    .dice-seven { box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.95), 0 0 26px rgba(239, 68, 68, 0.7), 0 6px 14px rgba(0,0,0,0.45); }
+
+    #roll-toast .roll-toast-inner { opacity: 0; transform: scale(0.4); }
+    #roll-toast.show .roll-toast-inner { animation: rollToast 1.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes rollToast {
+      0%   { opacity: 0; transform: scale(0.4) rotate(-8deg); }
+      18%  { opacity: 1; transform: scale(1.18) rotate(2deg); }
+      32%  { transform: scale(1) rotate(0deg); }
+      75%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.08) translateY(-30px); }
+    }
+
+    .timer-urgent { animation: timerPulse 0.5s ease-in-out infinite alternate; }
+    @keyframes timerPulse { from { transform: scale(1); } to { transform: scale(1.12); } }
+
+    .your-turn-flash { animation: yourTurnFlash 1.6s ease-out; }
+    @keyframes yourTurnFlash {
+      0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.9); transform: scale(1); }
+      20%  { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0.35); transform: scale(1.08); }
+      100% { box-shadow: 0 0 0 22px rgba(251, 191, 36, 0); transform: scale(1); }
+    }
+    @keyframes diceTumble {
+      0% { transform: rotate(0deg) scale(1.08) translateY(0px); }
+      25% { transform: rotate(-16deg) scale(1.15) translateY(-6px); }
+      50% { transform: rotate(12deg) scale(1.1) translateY(0px); }
+      75% { transform: rotate(-10deg) scale(1.14) translateY(-4px); }
+      100% { transform: rotate(0deg) scale(1.08) translateY(0px); }
+    }
+    .pip {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #1e293b;
+      margin: auto;
+      box-shadow: inset 0 1px 1px rgba(0,0,0,0.5);
+    }
+    .pip-red {
+      background: #dc2626;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.35);
+      border-radius: 999px;
+    }
+
+    /* Pulse ring for active phase */
+    @keyframes softPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.45); }
+      50% { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0); }
+    }
+    .pulse-gold {
+      animation: softPulse 2s infinite;
+    }
+
+    /* Setup screen controls */
+    .setting-tile {
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(51, 65, 85, 0.9);
+    }
+    .setting-label {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      letter-spacing: 0.02em;
+    }
+    .setting-value { min-width: 64px; text-align: center; font-weight: 800; font-size: 15px; color: #fcd34d; font-variant-numeric: tabular-nums; }
+    .setting-pill { min-width: 34px; text-align: center; padding: 2px 8px; border-radius: 999px; background: #f59e0b; color: #0f172a; font-weight: 800; font-size: 12px; }
+    .step-btn {
+      width: 30px; height: 30px; border-radius: 10px;
+      background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(71, 85, 105, 0.8);
+      color: #e2e8f0; font-size: 18px; font-weight: 800; line-height: 1;
+      transition: background 0.15s, transform 0.15s;
+    }
+    .step-btn:hover:not(:disabled) { background: rgba(245, 158, 11, 0.25); border-color: rgba(251, 191, 36, 0.6); }
+    .step-btn:active:not(:disabled) { transform: scale(0.92); }
+    .step-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .th-range { -webkit-appearance: none; appearance: none; height: 8px; border-radius: 999px; background: #334155; outline: none; cursor: pointer; }
+    .th-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 3px solid #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    .th-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 3px solid #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+    .map-card, .rule-card { transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s; }
+    .map-card:hover, .rule-card:hover { transform: translateY(-2px); }
+    .map-card.selected { border-color: #fbbf24; background: rgba(245, 158, 11, 0.14); box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.4), 0 8px 20px -8px rgba(245, 158, 11, 0.5); }
+    .rule-card.on { border-color: rgba(251, 191, 36, 0.8); background: rgba(245, 158, 11, 0.16); }
+    .rule-card.on .rule-check { background: #f59e0b; color: #0f172a; border-color: #f59e0b; }
+    #map-settings-section.locked { pointer-events: none; opacity: 0.55; }
+    #map-settings-section.locked #input-player-name,
+    #map-settings-section.locked .color-swatch { pointer-events: auto; }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between">
+
+  <!-- Full-Screen Interactive Game Board Canvas -->
+  <div id="canvas-container" class="fixed inset-0 z-0">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <!-- Top Navigation & Scoreboard Bar -->
+  <header class="relative z-10 flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-5 sm:py-3 pointer-events-none">
+    <!-- Brand & Map Info -->
+    <div class="glass-panel rounded-2xl px-3.5 py-2 flex items-center gap-3 pointer-events-auto">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+        <svg class="w-5 h-5 text-slate-950" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2L21 7V17L12 22L3 17V7L12 2ZM12 4.3L5 8.2V15.8L12 19.7L19 15.8V8.2L12 4.3ZM12 7L17 9.8V15.2L12 18L7 15.2V9.8L12 7Z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-display font-bold text-sm sm:text-base tracking-wider text-amber-300 leading-none">TERRA HEX</h1>
+          <span id="hud-map-badge" class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-800/90 text-slate-300 border border-slate-700">Classic Island</span>
+        </div>
+        <p id="hud-vp-goal" class="text-[11px] text-slate-400 mt-0.5">First to <strong class="text-amber-400">10 VP</strong> • Turn <span id="hud-turn">1</span></p>
+      </div>
+    </div>
+
+    <!-- Player Scoreboards -->
+    <div id="player-scoreboard" class="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto max-w-full pointer-events-auto py-0.5">
+      <!-- Populated dynamically -->
+    </div>
+
+    <!-- Utility Controls -->
+    <div class="glass-panel rounded-2xl p-1.5 flex items-center gap-1 pointer-events-auto">
+      <button id="btn-territory-toggle" title="Toggle Territorial Aura Overlay" class="p-2 rounded-xl hover:bg-slate-800/80 text-amber-300 transition flex items-center gap-1.5 text-xs font-semibold">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+        <span class="hidden md:inline">Territory</span>
+      </button>
+      <button id="btn-center-map" title="Recenter Board" class="p-2 rounded-xl hover:bg-slate-800/80 text-slate-300 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+      </button>
+      <button id="btn-rules" title="Building Costs & Rules" class="p-2 rounded-xl hover:bg-slate-800/80 text-slate-300 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+      </button>
+      <button id="btn-sound" title="Toggle Sound" class="p-2 rounded-xl hover:bg-slate-800/80 text-emerald-400 transition">
+        <svg id="icon-sound-on" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+        <svg id="icon-sound-off" class="w-4 h-4 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+      </button>
+      <button id="btn-new-game-open" title="Map & Game Settings" class="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/30 text-amber-300 text-xs font-bold transition">
+        New Map
+      </button>
+    </div>
+  </header>
+
+  <!-- Floating Status Banner & Activity Log (Left/Top-Center) -->
+  <div class="relative z-10 flex flex-col items-center pointer-events-none px-3">
+    <div id="turn-banner" class="glass-panel rounded-full px-4 py-1.5 flex items-center gap-2.5 shadow-xl border-amber-400/30">
+      <span id="turn-indicator-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+      <span id="turn-status-text" class="text-xs sm:text-sm font-semibold text-slate-100 tracking-wide">Welcome to Terra Hex! Configure your map to begin.</span>
+      <span id="turn-timer" class="hidden ml-1 px-2 py-0.5 rounded-full bg-slate-900/90 border border-slate-600 text-xs font-extrabold tabular-nums text-sky-300">⏱ 1:30</span>
+    </div>
+  </div>
+
+  <!-- Collapsible Activity Feed (Desktop Left) -->
+  <aside class="hidden lg:flex flex-col fixed left-4 top-24 bottom-36 w-64 z-10 pointer-events-none justify-end">
+    <div class="glass-panel rounded-2xl p-3 max-h-60 flex flex-col pointer-events-auto">
+      <div class="flex items-center justify-between border-b border-slate-700/60 pb-1.5 mb-2">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Chronicle Log</span>
+        <span class="text-[10px] text-slate-500">Live Events</span>
+      </div>
+      <div id="game-log" class="overflow-y-auto space-y-1.5 text-xs text-slate-300 pr-1">
+        <!-- Log entries -->
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Floating Dice & Dev Card Drawer -->
+  <aside class="fixed right-3 sm:right-5 top-20 sm:top-24 z-10 flex flex-col items-end gap-2.5 pointer-events-none">
+    <!-- Dice Box -->
+    <div id="dice-widget" class="glass-panel rounded-2xl p-3 flex flex-col items-center gap-2 pointer-events-auto">
+      <div class="flex items-center gap-2.5">
+        <div id="die-1" class="dice-cube"></div>
+        <div id="die-2" class="dice-cube"></div>
+      </div>
+      <div class="flex items-center justify-between w-full px-1">
+        <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Total</span>
+        <span id="dice-total-badge" class="text-sm font-extrabold text-amber-300">—</span>
+      </div>
+      <button id="btn-roll-dice" class="btn-action w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/25">
+        Roll Dice
+      </button>
+    </div>
+
+    <!-- Development Cards Hand -->
+    <div id="dev-cards-widget" class="glass-panel rounded-2xl p-2.5 w-44 pointer-events-auto">
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-purple-300">Dev Cards</span>
+        <span id="dev-deck-count" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">25 left</span>
+      </div>
+      <div id="player-dev-cards" class="space-y-1 max-h-36 overflow-y-auto">
+        <p class="text-[11px] text-slate-500 italic">No cards held</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Bottom Player Hand & Build/Trade Action Dock -->
+  <footer class="relative z-10 px-2 pb-2 sm:px-5 sm:pb-4 flex flex-col items-center gap-2 pointer-events-none">
+    <!-- Build & Trade Bar -->
+    <div class="glass-panel rounded-2xl p-1.5 sm:p-2 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 pointer-events-auto max-w-full">
+      <!-- Build Road -->
+      <button id="btn-build-road" data-action="road" class="btn-action flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-left">
+        <div class="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-bold text-sm">🛣️</div>
+        <div>
+          <div class="text-xs font-bold text-slate-100 leading-tight">Road</div>
+          <div class="text-[10px] text-slate-400 flex items-center gap-1">
+            <span title="Wood">🌲1</span><span title="Brick">🧱1</span>
+          </div>
+        </div>
+      </button>
+
+      <!-- Build Settlement -->
+      <button id="btn-build-settlement" data-action="settlement" class="btn-action flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-left">
+        <div class="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 font-bold text-sm">🏠</div>
+        <div>
+          <div class="text-xs font-bold text-slate-100 leading-tight">Settlement</div>
+          <div class="text-[10px] text-slate-400 flex items-center gap-1">
+            <span>🌲1</span><span>🧱1</span><span>🐑1</span><span>🌾1</span>
+          </div>
+        </div>
+      </button>
+
+      <!-- Upgrade to City -->
+      <button id="btn-build-city" data-action="city" class="btn-action flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-left">
+        <div class="w-7 h-7 rounded-lg bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-sky-300 font-bold text-sm">🏰</div>
+        <div>
+          <div class="text-xs font-bold text-slate-100 leading-tight">City</div>
+          <div class="text-[10px] text-slate-400 flex items-center gap-1">
+            <span>🌾2</span><span>⛰️3</span>
+          </div>
+        </div>
+      </button>
+
+      <!-- Buy Dev Card -->
+      <button id="btn-buy-dev" class="btn-action flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-left">
+        <div class="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300 font-bold text-sm">📜</div>
+        <div>
+          <div class="text-xs font-bold text-slate-100 leading-tight">Dev Card</div>
+          <div class="text-[10px] text-slate-400 flex items-center gap-1">
+            <span>🐑1</span><span>🌾1</span><span>⛰️1</span>
+          </div>
+        </div>
+      </button>
+
+      <div class="h-7 w-px bg-slate-700/70 hidden sm:block"></div>
+
+      <!-- Maritime / Bank Trade -->
+      <button id="btn-open-trade" class="btn-action flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 border border-indigo-400/40 text-xs font-bold text-white shadow-md">
+        <span>⚖️</span>
+        <span>Trade</span>
+      </button>
+
+      <!-- End Turn -->
+      <button id="btn-end-turn" class="btn-action flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 text-xs font-extrabold uppercase tracking-wider shadow-lg shadow-emerald-500/20">
+        <span>End Turn</span>
+        <span>➔</span>
+      </button>
+    </div>
+
+    <!-- Human Player Resource Cards Hand -->
+    <div id="resource-hand" class="flex items-end justify-center gap-1.5 sm:gap-2.5 pointer-events-auto">
+      <!-- Generated dynamically for Wood, Brick, Sheep, Wheat, Ore -->
+    </div>
+  </footer>
+
+  <!-- Big dice result pop-up -->
+  <div id="roll-toast" class="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
+    <div class="roll-toast-inner font-display font-extrabold text-6xl sm:text-8xl text-amber-300" style="text-shadow: 0 6px 24px rgba(0,0,0,0.8), 0 0 40px rgba(251,191,36,0.45);"></div>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- 1. PRE-GAME LOBBY / MAP & SETTINGS MODAL -->
+  <div id="modal-setup" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3 sm:p-6">
+    <div class="glass-panel rounded-3xl w-full max-w-4xl max-h-[92dvh] overflow-y-auto p-5 sm:p-7 border border-amber-400/25 shadow-2xl">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/70 pb-4 mb-5">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-widest text-amber-400">Empire Setup & World Generator</span>
+          <h2 class="font-display text-2xl sm:text-3xl font-extrabold text-white mt-0.5">Terra Hex</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-open-amp" type="button" class="px-3 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-bold flex items-center gap-1.5 transition">
+            <span>🖥️</span>
+            <span>CubeCoders AMP Host</span>
+          </button>
+          <button id="btn-close-setup" class="hidden p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">✕ Close</button>
+        </div>
+      </div>
+
+      <!-- Mode Switcher: Solo vs Multiplayer -->
+      <div class="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-900/90 border border-slate-800 mb-5">
+        <button type="button" id="tab-mode-solo" class="py-2 px-3 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition">
+          ⚔️ Singleplayer (vs AI)
+        </button>
+        <button type="button" id="tab-mode-multi" class="py-2 px-3 rounded-xl text-slate-300 hover:text-white font-extrabold text-xs uppercase tracking-wider transition">
+          🌐 Online Multiplayer Lobby
+        </button>
+      </div>
+
+      <!-- Multiplayer Room Panel (Hidden in Solo Mode) -->
+      <div id="multiplayer-lobby-panel" class="hidden mb-6 p-4 rounded-2xl bg-indigo-950/40 border border-indigo-400/30 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-indigo-300">Multiplayer Room Sync</div>
+            <p class="text-[11px] text-slate-400">Create a room code to invite friends, or enter an existing room code to join.</p>
+          </div>
+          <div id="mp-connection-badge" class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-900 text-emerald-400 border border-emerald-500/30">
+            ● Ready
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Create Room -->
+          <div class="p-3 rounded-xl bg-slate-900/75 border border-slate-800 flex flex-col justify-between gap-2">
+            <div class="text-xs font-bold text-white">Host New Room</div>
+            <p class="text-[11px] text-slate-400">Generate a 6-character Room Code and wait for players (remaining seats can use AI).</p>
+            <button type="button" id="btn-create-room" class="btn-action w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">
+              + Create Multiplayer Room
+            </button>
+          </div>
+
+          <!-- Join Room -->
+          <div class="p-3 rounded-xl bg-slate-900/75 border border-slate-800 flex flex-col justify-between gap-2">
+            <div class="text-xs font-bold text-white">Join Existing Room</div>
+            <div class="flex gap-1.5">
+              <input id="input-room-code" type="text" maxlength="6" placeholder="ROOM CODE" class="w-full px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-mono uppercase tracking-widest text-amber-300 focus:outline-none focus:border-amber-400" />
+              <button type="button" id="btn-join-room" class="btn-action px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs">
+                Join
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Room Roster -->
+        <div id="active-room-box" class="hidden p-3.5 rounded-xl bg-slate-950/80 border border-amber-400/30 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-400">Room Code:</span>
+              <span id="display-room-code" class="font-mono font-extrabold text-base tracking-widest text-amber-300 bg-slate-900 px-2.5 py-0.5 rounded-lg border border-amber-400/30">------</span>
+              <button type="button" id="btn-copy-room-code" class="text-[11px] px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold">Copy</button>
+            </div>
+            <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+              <input id="chk-fill-ai" type="checkbox" checked class="rounded bg-slate-800 border-slate-600 text-amber-500 focus:ring-0" />
+              <span>Fill empty seats with AI</span>
+            </label>
+          </div>
+          <div id="lobby-roster-list" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+        </div>
+      </div>
+
+      <!-- Game Settings -->
+      <div id="map-settings-section" class="space-y-6">
+        <div id="host-settings-note" class="hidden p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-[11px] text-slate-400 text-center">
+          The host chooses the map and rules for this room.
+        </div>
+
+        <section>
+          <div class="flex items-center justify-between mb-2.5">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">World Map</h3>
+            <span id="map-hint" class="text-[11px] text-slate-500"></span>
+          </div>
+          <div id="map-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-2"></div>
+        </section>
+
+        <section>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-2.5">Rules</h3>
+          <div id="rules-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+        </section>
+
+        <section>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-2.5">Advanced Settings</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div class="setting-tile">
+              <div class="setting-label">Turn Timer</div>
+              <div class="flex items-center justify-center gap-5">
+                <button type="button" class="step-btn" data-stepper="timer" data-dir="-1" aria-label="Shorter timer">‹</button>
+                <span id="val-timer" class="setting-value">90s</span>
+                <button type="button" class="step-btn" data-stepper="timer" data-dir="1" aria-label="Longer timer">›</button>
+              </div>
+            </div>
+            <div class="setting-tile">
+              <div class="setting-label">Players</div>
+              <div class="flex items-center justify-center gap-5">
+                <button type="button" class="step-btn" data-stepper="players" data-dir="-1" aria-label="Fewer players">‹</button>
+                <span id="val-players" class="setting-value">4</span>
+                <button type="button" class="step-btn" data-stepper="players" data-dir="1" aria-label="More players">›</button>
+              </div>
+            </div>
+            <div class="setting-tile">
+              <div class="setting-label">Points to Win</div>
+              <div class="flex items-center gap-3">
+                <span class="text-[11px] text-slate-500 w-5 text-right">3</span>
+                <div class="relative flex-1">
+                  <input id="range-vp" type="range" min="3" max="20" step="1" value="10" class="th-range w-full" />
+                </div>
+                <span class="text-[11px] text-slate-500 w-5">20</span>
+                <span id="val-vp" class="setting-pill">10</span>
+              </div>
+            </div>
+            <div class="setting-tile">
+              <div class="setting-label">Card Discard Limit</div>
+              <div class="flex items-center gap-3">
+                <span class="text-[11px] text-slate-500 w-5 text-right">5</span>
+                <div class="relative flex-1">
+                  <input id="range-discard" type="range" min="5" max="20" step="1" value="7" class="th-range w-full" />
+                </div>
+                <span class="text-[11px] text-slate-500 w-5">20</span>
+                <span id="val-discard" class="setting-pill">7</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Commander Info -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Commander Name</label>
+            <input id="input-player-name" type="text" value="Commander" maxlength="16" class="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white font-semibold focus:outline-none focus:border-amber-400" />
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Banner & Piece Color</label>
+            <div class="flex items-center gap-2 pt-1 flex-wrap">
+              <button type="button" data-color="#ef4444" class="color-swatch w-7 h-7 rounded-full bg-red-500 ring-2 ring-offset-2 ring-offset-slate-900 ring-white"></button>
+              <button type="button" data-color="#3b82f6" class="color-swatch w-7 h-7 rounded-full bg-blue-500 opacity-75"></button>
+              <button type="button" data-color="#10b981" class="color-swatch w-7 h-7 rounded-full bg-emerald-500 opacity-75"></button>
+              <button type="button" data-color="#f59e0b" class="color-swatch w-7 h-7 rounded-full bg-amber-500 opacity-75"></button>
+              <button type="button" data-color="#a855f7" class="color-swatch w-7 h-7 rounded-full bg-purple-500 opacity-75"></button>
+              <button type="button" data-color="#ec4899" class="color-swatch w-7 h-7 rounded-full bg-pink-500 opacity-75"></button>
+              <button type="button" data-color="#06b6d4" class="color-swatch w-7 h-7 rounded-full bg-cyan-500 opacity-75"></button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <button id="btn-start-game" class="btn-action w-full mt-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-slate-950 font-display font-extrabold text-base sm:text-lg tracking-wider shadow-xl shadow-amber-500/25">
+        LAUNCH EXPEDITION ⚔️
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. TRADING MODAL -->
+  <div id="modal-trade" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3">
+    <div class="glass-panel rounded-3xl w-full max-w-md p-5 sm:p-6 border border-indigo-400/30 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-700/70 pb-3">
+        <h3 class="font-display font-bold text-lg text-white">Maritime & Bank Trade</h3>
+        <button id="btn-close-trade" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">✕ Close</button>
+      </div>
+
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">You Give (Check your ports)</label>
+        <div id="trade-give-options" class="grid grid-cols-5 gap-2"></div>
+      </div>
+
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">You Receive (1 Resource)</label>
+        <div id="trade-receive-options" class="grid grid-cols-5 gap-2"></div>
+      </div>
+
+      <div class="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-center text-xs text-amber-300 font-semibold" id="trade-summary">
+        Select resources to trade.
+      </div>
+
+      <button id="btn-confirm-trade" disabled class="btn-action w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs uppercase tracking-wider">
+        Execute Trade ⚖️
+      </button>
+    </div>
+  </div>
+
+  <!-- 3. RESOURCE PICKER MODAL (Year of Plenty / Monopoly) -->
+  <div id="modal-resource-picker" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3">
+    <div class="glass-panel rounded-3xl w-full max-w-sm p-5 border border-purple-500/30 shadow-2xl space-y-4 text-center">
+      <h3 id="picker-title" class="font-display font-bold text-lg text-white">Pick Resource</h3>
+      <p id="picker-desc" class="text-xs text-slate-400">Choose a resource type.</p>
+      <div id="picker-buttons" class="grid grid-cols-5 gap-2 pt-2"></div>
+    </div>
+  </div>
+
+  <!-- 4. RULES & COSTS MODAL -->
+  <div id="modal-rules" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-3">
+    <div class="glass-panel rounded-3xl w-full max-w-lg p-5 sm:p-6 border border-slate-700 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+        <h3 class="font-display font-bold text-lg text-white">Terra Hex Rules & Costs</h3>
+        <button id="btn-close-rules" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">✕ Close</button>
+      </div>
+      <div class="space-y-3 text-xs text-slate-300">
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">Building Costs</div>
+          <ul class="space-y-1">
+            <li>🛣️ <strong>Road</strong>: 1 Wood, 1 Brick</li>
+            <li>🏠 <strong>Settlement</strong>: 1 Wood, 1 Brick, 1 Sheep, 1 Wheat (+1 VP)</li>
+            <li>🏰 <strong>City</strong>: 2 Wheat, 3 Ore (+2 VP, doubles resource yield)</li>
+            <li>📜 <strong>Dev Card</strong>: 1 Sheep, 1 Wheat, 1 Ore</li>
+          </ul>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">Victory & Ports</div>
+          <p>First player to reach the Target VP (default 10) wins the match. Build on coastal vertex dots with harbours to get 2:1 specialized trades or 3:1 general bank trades.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. VICTORY MODAL -->
+  <div id="modal-victory" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-3">
+    <div class="glass-panel rounded-3xl w-full max-w-md p-6 sm:p-8 border-2 border-amber-400 shadow-2xl text-center space-y-5">
+      <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 mx-auto flex items-center justify-center text-3xl shadow-xl shadow-amber-500/30">
+        🏆
+      </div>
+      <div>
+        <h2 id="victory-winner-name" class="font-display text-2xl sm:text-3xl font-extrabold text-amber-300">Commander Wins!</h2>
+        <p id="victory-subtitle" class="text-xs text-slate-400 mt-1">Achieved Victory Points</p>
+      </div>
+      <div id="victory-standings" class="space-y-2 text-left"></div>
+      <button id="btn-play-again" class="btn-action w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-display font-extrabold text-sm uppercase tracking-wider shadow-lg">
+        Play Another Expedition ⚔️
+      </button>
+    </div>
+  </div>
+
+  <!-- 6. CUBECODERS AMP SELF-HOSTING DEPLOYMENT MODAL -->
+  <div id="modal-amp" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 sm:p-6">
+    <div class="glass-panel rounded-3xl w-full max-w-2xl max-h-[90dvh] overflow-y-auto p-5 sm:p-6 border border-sky-400/35 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700/70 pb-3 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-lg">🖥️</div>
+          <div>
+            <h3 class="font-display font-bold text-lg text-white">Host Terra Hex on CubeCoders AMP</h3>
+            <p class="text-[11px] text-sky-300">Generic Module • Node.js Game & Multiplayer Server</p>
+          </div>
+        </div>
+        <button id="btn-close-amp" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">✕ Close</button>
+      </div>
+
+      <div class="space-y-4 text-xs text-slate-300">
+        <p class="leading-relaxed">
+          You can host <strong>Terra Hex</strong> directly on your <strong>CubeCoders AMP</strong> panel using AMP's <strong>Generic Application</strong> template. Click below to download a ready-to-upload standalone Node.js server file (<code class="text-amber-300">server.js</code>) paired with this game client.
+        </p>
+
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+          <div class="font-bold text-white text-sm">Step-by-Step CubeCoders AMP Setup</div>
+          <ol class="list-decimal list-inside space-y-1.5 text-slate-300">
+            <li>In AMP, click <strong>Create Instance</strong> and select the <strong>Generic Module</strong> (or <strong>Node.js</strong> template).</li>
+            <li>Open the instance's <strong>File Manager</strong> and upload <code class="text-amber-300">index.html</code> and <code class="text-amber-300">server.js</code> into the root directory.</li>
+            <li>In AMP <strong>Configuration → Generic Settings</strong>, set:
+              <div class="mt-1.5 p-2.5 rounded-xl bg-slate-950 font-mono text-[11px] text-emerald-300 space-y-1 border border-slate-800">
+                <div>Executable: /usr/bin/node</div>
+                <div>Arguments: server.js --port {{$ApplicationPort1}}</div>
+                <div>Application Port 1: 7779 (TCP)</div>
+              </div>
+            </li>
+            <li>Click <strong>Start</strong> in AMP and share <code class="text-sky-300">http://YOUR-SERVER-IP:7779</code> with your friends!</li>
+          </ol>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button type="button" id="btn-download-amp-server" class="btn-action flex-1 py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider">
+            ⬇️ Download server.js for AMP
+          </button>
+          <button type="button" id="btn-download-amp-html" class="btn-action flex-1 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider">
+            ⬇️ Download index.html Client
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+/**
+ * ============================================================================
+ * TERRA HEX — Complete Hexagonal Strategy Engine, Multiplayer & AMP Support
+ * ============================================================================
+ */
+
+// -------------------- 0. MULTIPLAYER ROOM SYNC (self-hosted server or cloud) --------------------
+const mp = {
+  enabled: false,
+  isHost: false,
+  roomCode: null,
+  localUid: null,
+  localSeatIdx: 0,
+  members: [],
+  unsub: null,
+  backend: null,
+  db: null,
+  auth: null,
+  appId: typeof __app_id !== 'undefined' ? __app_id : 'terra-hex-7779',
+  lastSyncVersion: 0
+};
+
+const SEAT_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4'];
+const MAX_HUMANS = 6;
+
+function setMpBadge(text, tone = 'ok') {
+  const el = document.getElementById('mp-connection-badge');
+  if (!el) return;
+  const tones = {
+    ok: 'text-emerald-400 border-emerald-500/30',
+    warn: 'text-amber-300 border-amber-400/40',
+    error: 'text-rose-400 border-rose-500/40'
+  };
+  el.className = `text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-900 border ${tones[tone] || tones.ok}`;
+  el.textContent = text;
+}
+
+// --- Backend A: the Terra Hex server.js relay (works on CubeCoders AMP / any Node host) ---
+const serverBackend = {
+  label: 'Self-hosted',
+  async init() {
+    let uid = null;
+    try { uid = sessionStorage.getItem('terrahex_uid'); } catch (_) {}
+    if (!uid) {
+      uid = 'p_' + (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 16) : Math.random().toString(36).slice(2, 14));
+      try { sessionStorage.setItem('terrahex_uid', uid); } catch (_) {}
+    }
+    return uid;
+  },
+  async request(path, body) {
+    const res = await fetch(path, body === undefined ? { cache: 'no-store' } : {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    let data = null;
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) {
+      const err = new Error((data && data.error) || ('HTTP ' + res.status));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  },
+  create(code, room) { return this.request(`api/rooms/${code}`, room); },
+  join(code, member) { return this.request(`api/rooms/${code}/join`, { member }); },
+  update(code, patch) { return this.request(`api/rooms/${code}/update`, { uid: mp.localUid, patch }); },
+  subscribe(code, onData, onError) {
+    const es = new EventSource(`api/rooms/${code}/events`);
+    es.onmessage = (ev) => { try { onData(JSON.parse(ev.data)); } catch (e) { console.warn('Bad room event', e); } };
+    es.onopen = () => onError(null);
+    es.onerror = () => onError(new Error('connection lost')); // EventSource reconnects by itself
+    return () => es.close();
+  }
+};
+
+// --- Backend B: Firebase, only when a cloud config is injected by the hosting page ---
+let fb = null;
+async function loadFirebase() {
+  if (fb) return fb;
+  const [appMod, authMod, fsMod] = await Promise.all([
+    import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"),
+    import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")
+  ]);
+  fb = { ...appMod, ...authMod, ...fsMod };
+  return fb;
+}
+function getRoomDocRef(code) {
+  return fb.doc(mp.db, 'artifacts', mp.appId, 'public', 'data', 'terra_hex_rooms', code);
+}
+const firebaseBackend = {
+  label: 'Cloud',
+  async init() {
+    const { initializeApp, getApps, getAuth, getFirestore, signInWithCustomToken, signInAnonymously } = await loadFirebase();
+    const app = getApps().length ? getApps()[0] : initializeApp(JSON.parse(__firebase_config));
+    mp.auth = getAuth(app);
+    mp.db = getFirestore(app);
+    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+      await signInWithCustomToken(mp.auth, __initial_auth_token);
+    } else {
+      await signInAnonymously(mp.auth);
+    }
+    return mp.auth.currentUser?.uid || ('player_' + Math.random().toString(36).slice(2, 10));
+  },
+  async create(code, room) { await fb.setDoc(getRoomDocRef(code), room); return room; },
+  async join(code, member) {
+    const snap = await fb.getDoc(getRoomDocRef(code));
+    if (!snap.exists()) { const e = new Error('Room not found'); e.status = 404; throw e; }
+    const data = snap.data();
+    const members = [...(data.members || [])];
+    const existing = members.find(m => m.uid === member.uid);
+    if (existing) {
+      existing.name = member.name;
+    } else {
+      if (data.status !== 'LOBBY') { const e = new Error('Game already started'); e.status = 409; throw e; }
+      if (members.length >= MAX_HUMANS) { const e = new Error('Room is full'); e.status = 409; throw e; }
+      const used = new Set(members.map(m => m.color));
+      members.push({ ...member, color: used.has(member.color) ? (SEAT_COLORS.find(c => !used.has(c)) || member.color) : member.color });
+    }
+    await fb.updateDoc(getRoomDocRef(code), { members });
+    return { ...data, members };
+  },
+  async update(code, patch) {
+    const syncVersion = mp.lastSyncVersion + 1;
+    await fb.updateDoc(getRoomDocRef(code), { ...patch, syncVersion });
+    return { syncVersion };
+  },
+  subscribe(code, onData, onError) {
+    return fb.onSnapshot(getRoomDocRef(code), (snap) => { if (snap.exists()) onData(snap.data()); }, onError);
+  }
+};
+
+// Pick whichever room service this host offers: injected cloud config first, then the Terra Hex server relay.
+async function initRoomBackend() {
+  if (mp.backend && mp.localUid) return mp.backend;
+  const candidates = [];
+  if (typeof __firebase_config !== 'undefined') candidates.push(firebaseBackend);
+  candidates.push(serverBackend);
+  for (const backend of candidates) {
+    try {
+      if (backend === serverBackend) {
+        const res = await fetch('api/health', { cache: 'no-store' });
+        if (!res.ok) throw new Error('no relay');
+      }
+      mp.localUid = await backend.init();
+      mp.backend = backend;
+      return backend;
+    } catch (err) {
+      console.warn(`${backend.label} rooms unavailable:`, err);
+    }
+  }
+  return null;
+}
+
+function cleanName(name, fallback = 'Commander') {
+  const n = String(name || '').replace(/[<>&"'`]/g, '').trim().slice(0, 16);
+  return n || fallback;
+}
+
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+async function createMultiplayerRoom() {
+  setMpBadge('● Connecting…', 'warn');
+  const backend = await initRoomBackend();
+  if (!backend) {
+    setMpBadge('✕ Rooms unavailable — open the game via server.js', 'error');
+    return;
+  }
+  const uid = mp.localUid;
+  const member = { uid, name: cleanName(document.getElementById('input-player-name').value), color: state.config.playerColor };
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateRoomCode();
+    try {
+      await backend.create(code, {
+        code,
+        hostUid: uid,
+        status: 'LOBBY',
+        members: [member],
+        config: state.config,
+        syncVersion: 0,
+        lastWriter: null,
+        snapshotJson: null
+      });
+      mp.enabled = true;
+      mp.isHost = true;
+      mp.roomCode = code;
+      mp.members = [member];
+      mp.lastSyncVersion = 0;
+      rememberRoom(code);
+      subscribeToRoom(code);
+      renderLobbyRoster();
+      return;
+    } catch (err) {
+      if (err.status !== 409) {
+        console.error('Create room failed:', err);
+        setMpBadge('✕ Could not create room', 'error');
+        return;
+      }
+      // 409 = code collision, try another code
+    }
+  }
+  setMpBadge('✕ Could not create room', 'error');
+}
+
+async function joinMultiplayerRoom(rawCode) {
+  const code = String(rawCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length < 4) {
+    setMpBadge('✕ Enter the 6-character code', 'error');
+    return;
+  }
+  setMpBadge('● Connecting…', 'warn');
+  const backend = await initRoomBackend();
+  if (!backend) {
+    setMpBadge('✕ Rooms unavailable — open the game via server.js', 'error');
+    return;
+  }
+
+  let room;
+  try {
+    room = await backend.join(code, {
+      uid: mp.localUid,
+      name: cleanName(document.getElementById('input-player-name').value, 'Explorer'),
+      color: state.config.playerColor
+    });
+  } catch (err) {
+    const msg = err.status === 404 ? '✕ Room not found' : (err.status === 409 ? `✕ ${err.message}` : '✕ Could not join room');
+    setMpBadge(msg, 'error');
+    return;
+  }
+
+  mp.enabled = true;
+  mp.isHost = room.hostUid === mp.localUid;
+  mp.roomCode = code;
+  mp.members = room.members || [];
+  mp.lastSyncVersion = 0;
+  rememberRoom(code);
+  subscribeToRoom(code);
+  renderLobbyRoster();
+}
+
+function rememberRoom(code) {
+  try { sessionStorage.setItem('terrahex_room', code); } catch (_) {}
+  const input = document.getElementById('input-room-code');
+  if (input) input.value = code;
+}
+
+function subscribeToRoom(code) {
+  if (mp.unsub) mp.unsub();
+  document.getElementById('active-room-box').classList.remove('hidden');
+  document.getElementById('display-room-code').textContent = code;
+  setMpBadge(`● Connected (${code})`, 'ok');
+
+  mp.unsub = mp.backend.subscribe(code, (data) => {
+    mp.members = data.members || [];
+    mp.isHost = data.hostUid === mp.localUid;
+    renderLobbyRoster();
+    const settingsSection = document.getElementById('map-settings-section');
+    settingsSection.classList.toggle('locked', !mp.isHost);
+    document.getElementById('host-settings-note').classList.toggle('hidden', mp.isHost);
+    if (mp.isHost && data.status === 'LOBBY' && JSON.stringify(data.config) !== JSON.stringify(state.config)) {
+      mp.backend.update(mp.roomCode, { config: state.config }).catch(() => {});
+    } else if (!mp.isHost && data.config && data.status === 'LOBBY') {
+      const myName = state.config.playerName, myColor = state.config.playerColor;
+      Object.assign(state.config, data.config, { playerName: myName, playerColor: myColor });
+      syncSettingsUI();
+    }
+
+    const startBtn = document.getElementById('btn-start-game');
+    if (data.status === 'LOBBY') {
+      if (!mp.isHost) {
+        startBtn.disabled = true;
+        startBtn.textContent = 'WAITING FOR HOST TO LAUNCH...';
+      } else {
+        startBtn.disabled = false;
+        startBtn.textContent = `LAUNCH MULTIPLAYER (${mp.members.length} HUMAN${mp.members.length > 1 ? 'S' : ''}) ⚔️`;
+      }
+    }
+
+    // Apply game snapshots written by someone else (our own writes are already applied locally)
+    if (data.status !== 'LOBBY' && data.snapshotJson && data.syncVersion > mp.lastSyncVersion) {
+      mp.lastSyncVersion = data.syncVersion;
+      if (data.lastWriter !== mp.localUid) {
+        applyRemoteState(JSON.parse(data.snapshotJson));
+      }
+    }
+  }, (err) => {
+    if (err) {
+      console.warn('Room sync error:', err);
+      setMpBadge(`● Reconnecting (${code})…`, 'warn');
+    } else {
+      setMpBadge(`● Connected (${code})`, 'ok');
+    }
+  });
+}
+
+function renderLobbyRoster() {
+  const list = document.getElementById('lobby-roster-list');
+  if (!list) return;
+  const slots = [];
+  for (let i = 0; i < MAX_HUMANS; i++) {
+    const m = mp.members[i];
+    if (m) {
+      const you = m.uid === mp.localUid ? ' <span class="text-[10px] text-amber-300">(you)</span>' : '';
+      slots.push(`
+        <div class="p-2 rounded-xl bg-slate-900 border border-slate-700 flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full shrink-0" style="background:${/^#[0-9a-f]{6}$/i.test(m.color) ? m.color : '#94a3b8'}"></span>
+          <span class="text-xs font-bold text-white truncate">${cleanName(m.name, 'Player')}${you}</span>
+        </div>
+      `);
+    } else {
+      slots.push(`
+        <div class="p-2 rounded-xl bg-slate-900/40 border border-dashed border-slate-800 text-[11px] text-slate-500 flex items-center justify-center">
+          Open / AI Seat
+        </div>
+      `);
+    }
+  }
+  list.innerHTML = slots.join('');
+}
+
+// Writes are queued and sent one at a time so an older snapshot can never overwrite a newer one.
+let pendingSnapshot = null;
+let sendingSnapshot = false;
+
+function broadcastGameState() {
+  if (!mp.enabled || !mp.roomCode || !mp.backend) return;
+  const payload = {
+    config: state.config,
+    hexes: state.hexes,
+    waterHexes: state.waterHexes,
+    vertices: state.vertices,
+    edges: state.edges,
+    players: state.players,
+    devDeck: state.devDeck,
+    turn: state.turn,
+    currentPlayerIdx: state.currentPlayerIdx,
+    phase: state.phase,
+    setupOrder: state.setupOrder,
+    setupStep: state.setupStep,
+    lastBuiltVertex: state.lastBuiltVertex,
+    freeRoadsLeft: state.freeRoadsLeft,
+    robberReturnPhase: state.robberReturnPhase,
+    devPlayedThisTurn: state.devPlayedThisTurn,
+    dice: state.dice,
+    diceBag: state.diceBag,
+    rollId: state.rollId,
+    turnDeadline: state.turnDeadline,
+    gameOver: state.gameOver,
+    hexSize: state.hexSize
+  };
+  // Room status is PLAYING/FINISHED — never the turn phase (that used to stop other players receiving moves)
+  pendingSnapshot = {
+    status: state.gameOver ? 'FINISHED' : 'PLAYING',
+    lastWriter: mp.localUid,
+    snapshotJson: JSON.stringify(payload)
+  };
+  if (!sendingSnapshot) flushSnapshots();
+}
+
+async function flushSnapshots() {
+  sendingSnapshot = true;
+  while (pendingSnapshot) {
+    const patch = pendingSnapshot;
+    pendingSnapshot = null;
+    try {
+      const result = await mp.backend.update(mp.roomCode, patch);
+      if (result && result.syncVersion > mp.lastSyncVersion) mp.lastSyncVersion = result.syncVersion;
+    } catch (e) {
+      console.warn('State broadcast failed:', e);
+      setMpBadge(`● Sync problem (${mp.roomCode})`, 'warn');
+      if (!pendingSnapshot) pendingSnapshot = patch; // retry with the latest state
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+  sendingSnapshot = false;
+}
+
+function applyRemoteState(remote) {
+  const prevRollId = state.rollId || 0;
+  const wasLobby = !document.getElementById('modal-setup').classList.contains('hidden');
+  Object.assign(state, {
+    config: remote.config,
+    hexes: remote.hexes,
+    waterHexes: remote.waterHexes || [],
+    vertices: remote.vertices,
+    edges: remote.edges,
+    players: remote.players,
+    devDeck: remote.devDeck,
+    turn: remote.turn,
+    currentPlayerIdx: remote.currentPlayerIdx,
+    phase: remote.phase,
+    setupOrder: remote.setupOrder,
+    setupStep: remote.setupStep,
+    lastBuiltVertex: remote.lastBuiltVertex,
+    freeRoadsLeft: remote.freeRoadsLeft,
+    robberReturnPhase: remote.robberReturnPhase || 'MAIN',
+    devPlayedThisTurn: Boolean(remote.devPlayedThisTurn),
+    dice: remote.dice,
+    diceBag: remote.diceBag || [],
+    rollId: remote.rollId || 0,
+    turnDeadline: remote.turnDeadline || null,
+    gameOver: remote.gameOver,
+    hexSize: remote.hexSize
+  });
+
+  const mySeat = state.players.findIndex(p => p.uid === mp.localUid);
+  mp.localSeatIdx = mySeat; // -1 = spectator
+
+  if (wasLobby) {
+    gameGeneration++;
+    document.getElementById('game-log').innerHTML = '';
+    logEvent(`🌐 Joined the expedition on <strong>${mapLabels[state.config.mapType]}</strong>.`);
+    document.getElementById('modal-setup').classList.add('hidden');
+    document.getElementById('btn-close-setup').classList.remove('hidden');
+    centerCamera();
+    refreshHeaderBadges();
+  }
+
+  if (!wasLobby && (remote.rollId || 0) !== prevRollId && !diceAnimating) {
+    animateDice(state.dice[0], state.dice[1]); // show other players' rolls too
+  } else {
+    renderDiceFaces(state.dice[0], state.dice[1]);
+  }
+  updateUI();
+
+  if (state.gameOver) {
+    const winner = state.players.find(p => calculatePlayerVP(p, true) >= state.config.vpTarget) || state.players[0];
+    showVictoryModal(winner);
+  } else if (mp.isHost && getCurrentPlayer()?.isAI) {
+    aiTimeout(runAITurn, 650);
+  }
+}
+
+// -------------------- 1. SYNTHESIZED WEB AUDIO SOUND ENGINE --------------------
+class SoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.muted = false;
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  playTone(freq, type = 'sine', duration = 0.15, gainVal = 0.12, slideFreq = null) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now);
+    if (slideFreq) {
+      osc.frequency.exponentialRampToValueAtTime(slideFreq, now + duration);
+    }
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(gainVal, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + duration + 0.02);
+  }
+
+  diceRoll() {
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        this.playTone(180 + Math.random() * 240, 'triangle', 0.06, 0.09, 110);
+      }, i * 55);
+    }
+  }
+
+  buildRoad() {
+    this.playTone(220, 'triangle', 0.14, 0.15, 330);
+    setTimeout(() => this.playTone(330, 'sine', 0.18, 0.12, 440), 70);
+  }
+
+  claimLand() {
+    const notes = [392.0, 493.88, 587.33, 783.99];
+    notes.forEach((n, idx) => {
+      setTimeout(() => this.playTone(n, 'triangle', 0.32, 0.14), idx * 65);
+    });
+  }
+
+  collectResource() {
+    this.playTone(587.33, 'sine', 0.11, 0.08, 880);
+  }
+
+  robberAlert() {
+    this.playTone(165, 'sawtooth', 0.28, 0.12, 110);
+    setTimeout(() => this.playTone(130.8, 'sawtooth', 0.35, 0.12, 92), 160);
+  }
+
+  playNoise(duration = 0.05, gainVal = 0.12, freq = 2200) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const len = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = freq;
+    filter.Q.value = 1.2;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(gainVal, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    src.start(now);
+  }
+
+  diceClack() {
+    this.playNoise(0.045, 0.16, 1500 + Math.random() * 1800);
+    this.playTone(500 + Math.random() * 400, 'square', 0.03, 0.025);
+  }
+
+  diceLand() {
+    this.playTone(150, 'sine', 0.28, 0.2, 55);
+    this.playNoise(0.08, 0.2, 900);
+    setTimeout(() => this.playNoise(0.05, 0.12, 1300), 90);
+  }
+
+  timerTick(urgent = false) {
+    this.playTone(urgent ? 1180 : 880, 'sine', 0.06, urgent ? 0.09 : 0.05);
+  }
+
+  timeUp() {
+    this.playTone(440, 'sawtooth', 0.22, 0.08, 220);
+    setTimeout(() => this.playTone(330, 'sawtooth', 0.3, 0.08, 150), 160);
+  }
+
+  yourTurn() {
+    // Rising horn-style call with a sparkle on top
+    const notes = [392.0, 523.25, 659.25, 783.99];
+    notes.forEach((n, i) => {
+      setTimeout(() => {
+        this.playTone(n, 'triangle', 0.42, 0.13);
+        this.playTone(n * 2, 'sine', 0.3, 0.035);
+      }, i * 95);
+    });
+    setTimeout(() => {
+      [1567.98, 2093.0, 2637.0].forEach((n, i) => setTimeout(() => this.playTone(n, 'sine', 0.25, 0.04), i * 60));
+    }, 420);
+  }
+
+  victory() {
+    const fanfare = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+    fanfare.forEach((n, i) => {
+      setTimeout(() => this.playTone(n, 'triangle', 0.35, 0.16), i * 130);
+    });
+  }
+}
+
+const sfx = new SoundEngine();
+
+// -------------------- 2. CONSTANTS & TERRAIN DEFINITIONS --------------------
+const RESOURCES = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
+
+const TERRAIN_META = {
+  wood:   { label: 'Forest',   resName: 'Wood',  icon: '🌲', color1: '#15803d', color2: '#064e3b', border: '#22c55e', cardBg: 'from-emerald-700 to-green-950' },
+  brick:  { label: 'Hills',    resName: 'Brick', icon: '🧱', color1: '#c2410c', color2: '#7c2d12', border: '#fb923c', cardBg: 'from-orange-700 to-red-950' },
+  sheep:  { label: 'Pasture',  resName: 'Sheep', icon: '🐑', color1: '#65a30d', color2: '#365314', border: '#a3e635', cardBg: 'from-lime-600 to-green-900' },
+  wheat:  { label: 'Fields',   resName: 'Wheat', icon: '🌾', color1: '#eab308', color2: '#a16207', border: '#fde047', cardBg: 'from-amber-500 to-yellow-900' },
+  ore:    { label: 'Mountain', resName: 'Ore',   icon: '⛰️', color1: '#64748b', color2: '#334155', border: '#cbd5e1', cardBg: 'from-slate-500 to-slate-800' },
+  desert: { label: 'Desert',   resName: 'None',  icon: '🏜️', color1: '#d97706', color2: '#92400e', border: '#fbbf24', cardBg: 'from-amber-700 to-stone-900' },
+  water:  { label: 'Sea',      resName: 'None',  icon: '🌊', color1: '#0369a1', color2: '#0c4a6e', border: '#38bdf8', cardBg: '' }
+};
+
+const BUILD_COSTS = {
+  road:       { wood: 1, brick: 1 },
+  settlement: { wood: 1, brick: 1, sheep: 1, wheat: 1 },
+  city:       { wheat: 2, ore: 3 },
+  dev:        { sheep: 1, wheat: 1, ore: 1 }
+};
+
+const DEV_CARD_META = {
+  knight:      { name: 'Knight',         icon: '⚔️', desc: 'Move Robber & steal 1 resource. +1 Army.' },
+  roadBuilder: { name: 'Road Building',  icon: '🛣️', desc: 'Build 2 roads immediately for free.' },
+  yearPlenty:  { name: 'Year of Plenty', icon: '🌽', desc: 'Gain any 2 resources from the bank.' },
+  monopoly:    { name: 'Monopoly',       icon: '💰', desc: 'Claim all of 1 resource type from rivals.' },
+  vp:          { name: 'Grand Monument', icon: '🏛️', desc: '+1 Secret Victory Point.' }
+};
+
+const PIP_DOTS = {
+  2: 1, 3: 2, 4: 3, 5: 4, 6: 5,
+  8: 5, 9: 4, 10: 3, 11: 2, 12: 1
+};
+
+const AI_PROFILES = [
+  { name: 'Lady Aurelia',  color: '#3b82f6' },
+  { name: 'Baron Vane',    color: '#10b981' },
+  { name: 'Duchess Lyra',  color: '#a855f7' },
+  { name: 'Lord Kael',     color: '#f59e0b' },
+  { name: 'Countess Mira', color: '#ec4899' },
+  { name: 'Sir Orrin',     color: '#06b6d4' },
+  { name: 'Warden Thorne', color: '#ef4444' }
+];
+
+// -------------------- 3. GLOBAL GAME STATE --------------------
+const state = {
+  config: {
+    mapType: 'classic',
+    playerName: 'Commander',
+    playerColor: '#ef4444',
+    playerCount: 4,
+    vpTarget: 10,
+    discardLimit: 7,
+    turnSeconds: 90,
+    friendlyRobber: true,
+    balancedDice: false,
+    balancedNumbers: true,
+    hiddenHands: false
+  },
+  waterHexes: [],
+  hexes: [],
+  vertices: [],
+  edges: [],
+  players: [],
+  devDeck: [],
+  turn: 1,
+  currentPlayerIdx: 0,
+  phase: 'SETUP_SETTLEMENT',
+  setupOrder: [],
+  setupStep: 0,
+  lastBuiltVertex: null,
+  freeRoadsLeft: 0,
+  buildMode: null,
+  dice: [3, 4],
+  showTerritory: true,
+  gameOver: false,
+
+  animations: {
+    shockwaves: [],
+    particles: [],
+    floatingTexts: [],
+    flyingCards: [],
+    hexPulses: []
+  },
+
+  camera: {
+    x: 0,
+    y: 0,
+    zoom: 1,
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    moved: false
+  },
+  hexSize: 54,
+  hoveredVertex: null,
+  hoveredEdge: null,
+  hoveredHex: null
+};
+
+// -------------------- 4. HEX GEOMETRY & MAP GENERATION --------------------
+function axialToPixel(q, r, size) {
+  const x = size * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r);
+  const y = size * ((3 / 2) * r);
+  return { x, y };
+}
+
+function generateAxialCoords(radius) {
+  const coords = [];
+  for (let q = -radius; q <= radius; q++) {
+    const r1 = Math.max(-radius, -q - radius);
+    const r2 = Math.min(radius, -q + radius);
+    for (let r = r1; r <= r2; r++) {
+      coords.push({ q, r });
+    }
+  }
+  return coords;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// -------------------- MAP LIBRARY --------------------
+// Shapes are axial hex cells. type: 'land' (random terrain), 'desert', 'rich' (ore/wheat/sheep), 'water' (lake/sea, decorative)
+function hexKey(q, r) { return `${q},${r}`; }
+function axialDistance(q, r) { return Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r)); }
+
+function shapeHexagon(radius, typeFor = () => 'land') {
+  const cells = [];
+  generateAxialCoords(radius).forEach(({ q, r }) => {
+    const type = typeFor(q, r);
+    if (type) cells.push({ q, r, type });
+  });
+  return cells;
+}
+
+// Odd-row offset ASCII art: one character per hex, odd rows are drawn half a hex to the right.
+// '.' land, 'D' desert, '*' rich, '~' water, anything else = nothing
+function shapeFromAscii(rows) {
+  const cells = [];
+  rows.forEach((row, r) => {
+    [...row].forEach((ch, col) => {
+      const type = { '.': 'land', 'D': 'desert', '*': 'rich', '~': 'water' }[ch];
+      if (!type) return;
+      cells.push({ q: col - (r - (r & 1)) / 2, r, type });
+    });
+  });
+  return cells;
+}
+
+function hexRing(radius) {
+  const dirs = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+  const out = [];
+  let q = -radius, r = radius; // start at direction 4 * radius
+  for (let side = 0; side < 6; side++) {
+    for (let step = 0; step < radius; step++) {
+      out.push({ q, r });
+      q += dirs[side][0];
+      r += dirs[side][1];
+    }
+  }
+  return out;
+}
+
+function shapeWildFrontier() {
+  // Random connected landmass grown outwards from the centre
+  const target = 24 + Math.floor(Math.random() * 8);
+  const land = new Map([[hexKey(0, 0), { q: 0, r: 0 }]]);
+  const dirs = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+  let guard = 0;
+  while (land.size < target && guard++ < 5000) {
+    const cells = [...land.values()];
+    const base = cells[Math.floor(Math.random() * cells.length)];
+    const [dq, dr] = dirs[Math.floor(Math.random() * 6)];
+    const q = base.q + dq, r = base.r + dr;
+    if (axialDistance(q, r) > 4) continue;
+    const n = dirs.filter(([a, b]) => land.has(hexKey(q + a, r + b))).length;
+    if (n >= 2 || Math.random() < 0.25) land.set(hexKey(q, r), { q, r });
+  }
+  return [...land.values()].map(c => ({ ...c, type: 'land' }));
+}
+
+const MAPS = [
+  {
+    id: 'classic', name: 'Classic Island', players: '2–4',
+    cells: () => shapeHexagon(2)
+  },
+  {
+    id: 'diamond', name: 'Diamond', players: '3–4',
+    cells: () => shapeFromAscii(['  .', ' ..', ' ...', '....', '.....', '....', ' ...', ' ..', '  .'])
+  },
+  {
+    id: 'oasis', name: 'Desert Oasis', players: '2–4', deserts: 0,
+    cells: () => shapeHexagon(2, (q, r) => (q === 0 && r === 0) ? 'desert' : (axialDistance(q, r) === 1 ? 'rich' : 'land'))
+  },
+  {
+    id: 'lakes', name: 'Lakes', players: '3–5',
+    cells: () => {
+      const lakes = new Set(['1,-2', '-2,1', '1,1']);
+      return shapeHexagon(3, (q, r) => lakes.has(hexKey(q, r)) ? 'water' : 'land');
+    }
+  },
+  {
+    id: 'gear', name: 'Gear', players: '3–5',
+    cells: () => {
+      const cells = shapeHexagon(2, (q, r) => (q === 0 && r === 0) ? 'water' : 'land');
+      hexRing(3).forEach((c, i) => { if (i % 3 === 1) cells.push({ ...c, type: 'land' }); });
+      return cells;
+    }
+  },
+  {
+    id: 'archipelago', name: 'Archipelago', players: '3–5',
+    cells: () => {
+      const sea = new Set(['0,-2', '0,-1', '0,1', '0,2', '-1,0', '1,0', '-2,2', '2,-2']);
+      return shapeHexagon(3, (q, r) => sea.has(hexKey(q, r)) ? null : 'land');
+    }
+  },
+  {
+    id: 'twinisles', name: 'Twin Isles', players: '3–5',
+    cells: () => {
+      const cells = [];
+      [[-3, 0], [3, 0]].forEach(([cq, cr]) => {
+        generateAxialCoords(2).forEach(({ q, r }) => {
+          const isCorner = axialDistance(q, r) === 2 && (q === 0 || r === 0 || q + r === 0);
+          if (!isCorner) cells.push({ q: q + cq, r: r + cr, type: 'land' });
+        });
+      });
+      cells.push({ q: 0, r: 0, type: 'land' }); // land bridge
+      return cells;
+    }
+  },
+  {
+    id: 'pangea', name: 'Grand Continent', players: '4–6',
+    cells: () => shapeHexagon(3)
+  },
+  {
+    id: 'isles', name: 'British Isles', players: '4–6',
+    cells: () => shapeFromAscii([
+      '      ..',
+      '     ...',
+      '     ..',
+      '    ...',
+      ' ..  ..',
+      '...  ...',
+      '...   ..',
+      '....  ...',
+      ' ..  ....',
+      '    .....',
+      '    .....',
+      '  .......',
+      ' .....'
+    ])
+  },
+  {
+    id: 'wild', name: 'Wild Frontier', players: '2–5', random: true,
+    cells: () => shapeWildFrontier()
+  }
+];
+const MAP_BY_ID = Object.fromEntries(MAPS.map(m => [m.id, m]));
+const mapLabels = Object.fromEntries(MAPS.map(m => [m.id, m.name]));
+
+// Spread terrain types in classic proportions across any number of tiles
+function terrainPool(count) {
+  const weights = { wood: 4, sheep: 4, wheat: 4, brick: 3, ore: 3 };
+  const total = 18;
+  const pool = [];
+  const fractions = [];
+  Object.entries(weights).forEach(([t, w]) => {
+    const exact = count * w / total;
+    const n = Math.floor(exact);
+    for (let i = 0; i < n; i++) pool.push(t);
+    fractions.push({ t, frac: exact - n });
+  });
+  fractions.sort((a, b) => b.frac - a.frac);
+  for (let i = 0; pool.length < count; i++) pool.push(fractions[i % fractions.length].t);
+  return shuffle(pool);
+}
+
+function numberPool(count) {
+  const base = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
+  const pool = [];
+  while (pool.length < count) pool.push(...shuffle(base));
+  return shuffle(pool.slice(0, count));
+}
+
+function buildBoard(mapType) {
+  state.hexes = [];
+  state.vertices = [];
+  state.edges = [];
+  state.waterHexes = [];
+
+  const def = MAP_BY_ID[mapType] || MAP_BY_ID.classic;
+  const cells = def.cells();
+  const S = state.hexSize;
+
+  // Centre the board on the origin
+  const pix = cells.map(c => axialToPixel(c.q, c.r, S));
+  const cx = pix.reduce((a, p) => a + p.x, 0) / pix.length;
+  const cy = pix.reduce((a, p) => a + p.y, 0) / pix.length;
+
+  const landCells = cells.filter(c => c.type !== 'water');
+  cells.filter(c => c.type === 'water').forEach(c => {
+    const p = axialToPixel(c.q, c.r, S);
+    state.waterHexes.push({ q: c.q, r: c.r, x: p.x - cx, y: p.y - cy });
+  });
+
+  // Terrain
+  const randomCells = landCells.filter(c => c.type === 'land');
+  const explicitDeserts = landCells.filter(c => c.type === 'desert').length;
+  const extraDeserts = def.deserts !== undefined ? def.deserts : Math.max(explicitDeserts ? 0 : 1, Math.round(landCells.length / 19) - explicitDeserts);
+  const pool = [...Array(extraDeserts).fill('desert'), ...terrainPool(Math.max(0, randomCells.length - extraDeserts))];
+  const shuffledPool = shuffle(pool);
+  let poolIdx = 0;
+  const terrains = landCells.map(c => {
+    if (c.type === 'desert') return 'desert';
+    if (c.type === 'rich') return ['ore', 'wheat', 'sheep', 'ore', 'wheat'][Math.floor(Math.random() * 5)];
+    return shuffledPool[poolIdx++];
+  });
+
+  // Number tokens; balanced mode keeps 6s and 8s (and identical numbers) apart
+  const numberedIdx = landCells.map((c, i) => i).filter(i => terrains[i] !== 'desert');
+  const indexByKey = new Map(landCells.map((c, i) => [hexKey(c.q, c.r), i]));
+  const dirs = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+  const neighboursOf = (i) => dirs.map(([dq, dr]) => indexByKey.get(hexKey(landCells[i].q + dq, landCells[i].r + dr))).filter(n => n !== undefined);
+  const scoreLayout = (nums) => {
+    let bad = 0;
+    numberedIdx.forEach(i => {
+      neighboursOf(i).forEach(n => {
+        if (nums[n] === undefined || n < i) return;
+        const hot = (x) => x === 6 || x === 8;
+        if (hot(nums[i]) && hot(nums[n])) bad += 3;
+        else if (nums[i] === nums[n]) bad += 1;
+      });
+    });
+    return bad;
+  };
+  let bestNums = null, bestScore = Infinity;
+  const attempts = state.config.balancedNumbers ? 400 : 1;
+  for (let t = 0; t < attempts && bestScore > 0; t++) {
+    const tokens = numberPool(numberedIdx.length);
+    const nums = {};
+    numberedIdx.forEach((i, k) => { nums[i] = tokens[k]; });
+    const sc = state.config.balancedNumbers ? scoreLayout(nums) : 0;
+    if (sc < bestScore) { bestScore = sc; bestNums = nums; }
+  }
+
+  let robberPlaced = false;
+  landCells.forEach((c, idx) => {
+    const t = terrains[idx];
+    const p = axialToPixel(c.q, c.r, S);
+    const placeRobber = t === 'desert' && !robberPlaced;
+    if (placeRobber) robberPlaced = true;
+    state.hexes.push({
+      id: idx, q: c.q, r: c.r,
+      terrain: t,
+      number: t === 'desert' ? null : bestNums[idx],
+      hasRobber: placeRobber,
+      x: p.x - cx, y: p.y - cy
+    });
+  });
+
+  const vertexMap = new Map();
+  const edgeMap = new Map();
+
+  state.hexes.forEach(hex => {
+    const corners = [];
+    for (let i = 0; i < 6; i++) {
+      const angleRad = (Math.PI / 180) * (60 * i - 30);
+      const vx = hex.x + state.hexSize * Math.cos(angleRad);
+      const vy = hex.y + state.hexSize * Math.sin(angleRad);
+      const key = `${Math.round(vx * 10)},${Math.round(vy * 10)}`;
+
+      let vertex = vertexMap.get(key);
+      if (!vertex) {
+        vertex = {
+          id: state.vertices.length,
+          x: vx,
+          y: vy,
+          hexIds: [],
+          adjVertexIds: [],
+          edgeIds: [],
+          owner: null,
+          building: null,
+          port: null
+        };
+        vertexMap.set(key, vertex);
+        state.vertices.push(vertex);
+      }
+      if (!vertex.hexIds.includes(hex.id)) vertex.hexIds.push(hex.id);
+      corners.push(vertex);
+    }
+
+    for (let i = 0; i < 6; i++) {
+      const vA = corners[i];
+      const vB = corners[(i + 1) % 6];
+      const minId = Math.min(vA.id, vB.id);
+      const maxId = Math.max(vA.id, vB.id);
+      const eKey = `${minId}_${maxId}`;
+
+      let edge = edgeMap.get(eKey);
+      if (!edge) {
+        edge = {
+          id: state.edges.length,
+          v1: minId,
+          v2: maxId,
+          x: (vA.x + vB.x) / 2,
+          y: (vA.y + vB.y) / 2,
+          owner: null,
+          hexCount: 0,
+          hexId: hex.id
+        };
+        edgeMap.set(eKey, edge);
+        state.edges.push(edge);
+
+        vA.adjVertexIds.push(vB.id);
+        vB.adjVertexIds.push(vA.id);
+        vA.edgeIds.push(edge.id);
+        vB.edgeIds.push(edge.id);
+      }
+      edge.hexCount++;
+    }
+  });
+
+  // Harbours spaced evenly around the coast, scaled to coastline length
+  const nearLake = (e) => state.waterHexes.some(w => Math.hypot(w.x - e.x, w.y - e.y) < state.hexSize * 0.95);
+  const coastalEdges = state.edges.filter(e => e.hexCount === 1 && !nearLake(e));
+  coastalEdges.sort((a, b) => Math.atan2(a.y, a.x) - Math.atan2(b.y, b.x));
+  const portCount = Math.max(5, Math.min(12, Math.round(coastalEdges.length / 3.4)));
+  const specific = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
+  const portTypes = [];
+  for (let i = 0; i < portCount; i++) {
+    if (i < 5) portTypes.push(specific[i]);
+    else if (i % 3 === 2) portTypes.push(specific[i % 5]);
+    else portTypes.push('3:1');
+  }
+  const shuffledPorts = shuffle(portTypes);
+  const stepSize = coastalEdges.length / portCount;
+  let pIdx = 0;
+  const offset = Math.floor(Math.random() * Math.max(1, stepSize));
+  for (let slot = 0; slot < portCount && coastalEdges.length; slot++) {
+    const start = Math.floor(offset + slot * stepSize);
+    for (let probe = 0; probe < Math.ceil(stepSize) + 2; probe++) {
+      const edge = coastalEdges[(start + probe) % coastalEdges.length];
+      const v1 = state.vertices[edge.v1];
+      const v2 = state.vertices[edge.v2];
+      const crowded = [v1, v2].some(v => v.port || v.adjVertexIds.some(a => state.vertices[a].port));
+      if (!crowded) {
+        const pObj = { type: shuffledPorts[pIdx++], edgeId: edge.id };
+        v1.port = pObj;
+        v2.port = pObj;
+        break;
+      }
+    }
+  }
+}
+
+// -------------------- 5. INITIALIZE MATCH & PLAYERS --------------------
+function startNewGame() {
+  const nameInput = document.getElementById('input-player-name');
+  if (nameInput) state.config.playerName = cleanName(nameInput.value);
+
+  state.hexSize = 54;
+  buildBoard(state.config.mapType);
+
+  state.players = [];
+  if (mp.enabled && mp.members.length > 0) {
+    mp.members.forEach((m, idx) => {
+      state.players.push({
+        id: idx,
+        uid: m.uid,
+        name: cleanName(m.name, 'Player ' + (idx + 1)),
+        color: m.color,
+        isAI: false,
+        resources: { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 },
+        devCards: [],
+        knightsPlayed: 0,
+        longestRoad: 0,
+        hasLongestRoad: false,
+        hasLargestArmy: false
+      });
+    });
+
+    const fillAI = document.getElementById('chk-fill-ai').checked;
+    const targetSeats = fillAI ? Math.max(state.config.playerCount, state.players.length) : state.players.length;
+    const usedColors = new Set(state.players.map(p => p.color));
+    const availableAI = AI_PROFILES.filter(p => !usedColors.has(p.color));
+
+    let aiIdx = 0;
+    while (state.players.length < targetSeats && aiIdx < availableAI.length) {
+      const prof = availableAI[aiIdx++];
+      state.players.push({
+        id: state.players.length,
+        uid: null,
+        name: `${prof.name} (AI)`,
+        color: prof.color,
+        isAI: true,
+        resources: { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 },
+        devCards: [],
+        knightsPlayed: 0,
+        longestRoad: 0,
+        hasLongestRoad: false,
+        hasLargestArmy: false
+      });
+    }
+    mp.localSeatIdx = Math.max(0, state.players.findIndex(p => p.uid === mp.localUid));
+  } else {
+    mp.localSeatIdx = 0;
+    state.players.push({
+      id: 0,
+      uid: mp.localUid || 'local_0',
+      name: state.config.playerName,
+      color: state.config.playerColor,
+      isAI: false,
+      resources: { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 },
+      devCards: [],
+      knightsPlayed: 0,
+      longestRoad: 0,
+      hasLongestRoad: false,
+      hasLargestArmy: false
+    });
+
+    const availableAI = AI_PROFILES.filter(p => p.color !== state.config.playerColor);
+    for (let i = 1; i < state.config.playerCount; i++) {
+      const prof = availableAI[(i - 1) % availableAI.length];
+      state.players.push({
+        id: i,
+        uid: null,
+        name: prof.name,
+        color: prof.color,
+        isAI: true,
+        resources: { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 },
+        devCards: [],
+        knightsPlayed: 0,
+        longestRoad: 0,
+        hasLongestRoad: false,
+        hasLargestArmy: false
+      });
+    }
+  }
+
+  // Setup Development Deck
+  state.devDeck = [];
+  const cardTypes = [
+    ...Array(14).fill('knight'),
+    ...Array(5).fill('vp'),
+    ...Array(2).fill('roadBuilder'),
+    ...Array(2).fill('yearPlenty'),
+    ...Array(2).fill('monopoly')
+  ];
+  shuffle(cardTypes).forEach((type, idx) => {
+    state.devDeck.push({ id: idx, type, played: false });
+  });
+
+  gameGeneration++;
+  state.turn = 1;
+  state.currentPlayerIdx = 0;
+  state.phase = 'SETUP_SETTLEMENT';
+  state.buildMode = 'settlement';
+  state.gameOver = false;
+  state.lastBuiltVertex = null;
+  state.freeRoadsLeft = 0;
+  state.robberReturnPhase = 'MAIN';
+  state.devPlayedThisTurn = false;
+  state.animations.shockwaves = [];
+  state.animations.particles = [];
+  state.animations.floatingTexts = [];
+  state.animations.flyingCards = [];
+  state.animations.hexPulses = [];
+
+  document.getElementById('modal-victory').classList.add('hidden');
+  document.getElementById('game-log').innerHTML = '';
+  refreshHeaderBadges();
+
+  // Snake draft setup order (0 -> 1 -> 2 -> 3 -> 3 -> 2 -> 1 -> 0)
+  state.setupOrder = [];
+  for (let i = 0; i < state.players.length; i++) state.setupOrder.push(i);
+  for (let i = state.players.length - 1; i >= 0; i--) state.setupOrder.push(i);
+  state.setupStep = 0;
+  state.currentPlayerIdx = state.setupOrder[0];
+
+  startTurnClock();
+  document.getElementById('modal-setup').classList.add('hidden');
+  document.getElementById('btn-close-setup').classList.remove('hidden');
+  centerCamera();
+
+  logEvent(`🚀 Expedition launched on <strong>${mapLabels[state.config.mapType]}</strong>! First round: place your initial Settlements.`);
+  updateUI();
+  if (mp.enabled) broadcastGameState('PLAYING');
+
+  if (getCurrentPlayer().isAI && shouldRunAI()) {
+    aiTimeout(runAITurn, 650);
+  }
+}
+
+function refreshHeaderBadges() {
+  const badge = document.getElementById('hud-map-badge');
+  if (badge) badge.textContent = mapLabels[state.config.mapType] || 'Classic Island';
+  const goal = document.getElementById('hud-vp-goal');
+  if (goal) goal.innerHTML = `First to <strong class="text-amber-400">${state.config.vpTarget} VP</strong> • Turn <span id="hud-turn">${state.turn}</span>`;
+}
+
+// -------------------- 6. BUILD & RULE VALIDATION --------------------
+// Timers tied to the current game: starting a new map invalidates any pending AI moves from the old one.
+let gameGeneration = 0;
+function aiTimeout(fn, ms) {
+  const gen = gameGeneration;
+  return setTimeout(() => {
+    if (gen === gameGeneration && !state.gameOver) fn();
+  }, ms);
+}
+
+// Seat controlled by this browser (0 in solo play, assigned seat in multiplayer, -1 for spectators)
+function localSeat() {
+  return mp.enabled ? mp.localSeatIdx : 0;
+}
+function getLocalPlayer() {
+  return state.players[localSeat()] || null;
+}
+function isLocalTurn() {
+  const c = getCurrentPlayer();
+  return Boolean(c && !c.isAI && !state.gameOver && c.id === localSeat());
+}
+function shouldRunAI() {
+  return !mp.enabled || mp.isHost;
+}
+
+function canPlayDevCard(player, card) {
+  if (!card || card.played || card.type === 'vp') return false;
+  if (card.boughtTurn === state.turn && card.boughtBy === player.id) return false; // not on the turn it was bought
+  if (state.devPlayedThisTurn) return false; // one dev card per turn
+  return state.phase === 'MAIN' || state.phase === 'ROLL';
+}
+
+function getCurrentPlayer() {
+  if (!state.players || state.players.length === 0) return null;
+  const idx = Math.min(state.currentPlayerIdx, state.players.length - 1);
+  return state.players[idx];
+}
+
+function canAfford(player, cost) {
+  for (const [res, amt] of Object.entries(cost)) {
+    if ((player.resources[res] || 0) < amt) return false;
+  }
+  return true;
+}
+
+function payCost(player, cost) {
+  for (const [res, amt] of Object.entries(cost)) {
+    player.resources[res] -= amt;
+  }
+}
+
+function getTotalResources(player) {
+  return Object.values(player.resources).reduce((a, b) => a + b, 0);
+}
+
+function calculatePlayerVP(player, includeSecretVP = false) {
+  let vp = 0;
+  state.vertices.forEach(v => {
+    if (v.owner === player.id) {
+      vp += (v.building === 'city' ? 2 : 1);
+    }
+  });
+  if (player.hasLongestRoad) vp += 2;
+  if (player.hasLargestArmy) vp += 2;
+  if (includeSecretVP) {
+    player.devCards.forEach(c => {
+      if (c.type === 'vp') vp += 1;
+    });
+  }
+  return vp;
+}
+
+function isValidSettlementVertex(vertex, playerId, isSetup) {
+  if (vertex.owner !== null) return false;
+  // Distance rule: no adjacent vertex can have a building
+  for (const adjId of vertex.adjVertexIds) {
+    if (state.vertices[adjId].owner !== null) return false;
+  }
+  if (isSetup) return true;
+
+  // In main game, must connect to player's road
+  let connectedByRoad = false;
+  for (const edgeId of vertex.edgeIds) {
+    if (state.edges[edgeId].owner === playerId) {
+      connectedByRoad = true;
+      break;
+    }
+  }
+  return connectedByRoad;
+}
+
+function isValidRoadEdge(edge, playerId, isSetup) {
+  if (edge.owner !== null) return false;
+  if (isSetup) {
+    if (state.lastBuiltVertex !== null) {
+      const v1 = state.vertices[edge.v1];
+      const v2 = state.vertices[edge.v2];
+      return v1.id === state.lastBuiltVertex || v2.id === state.lastBuiltVertex;
+    }
+    return true;
+  }
+
+  // Must connect to player's road or building
+  const v1 = state.vertices[edge.v1];
+  const v2 = state.vertices[edge.v2];
+  if (v1.owner === playerId || v2.owner === playerId) return true;
+
+  for (const eId of v1.edgeIds) {
+    if (eId !== edge.id && state.edges[eId].owner === playerId) return true;
+  }
+  for (const eId of v2.edgeIds) {
+    if (eId !== edge.id && state.edges[eId].owner === playerId) return true;
+  }
+  return false;
+}
+
+// -------------------- 7. VFX & TAKEOVER ANIMATIONS --------------------
+function triggerLandTakeoverVFX(x, y, color, type = 'settlement', badgeText = '+1 VP') {
+  sfx.claimLand();
+  // Expanding shockwave rings
+  state.animations.shockwaves.push({
+    x, y, radius: 10, maxRadius: type === 'city' ? 110 : 75, color, alpha: 0.9, lineWidth: type === 'city' ? 4 : 3
+  });
+
+  // Particle explosion
+  for (let i = 0; i < 28; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.5 + Math.random() * 5.5;
+    state.animations.particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2.5 + Math.random() * 3.5,
+      color: Math.random() > 0.4 ? color : '#fde047',
+      alpha: 1,
+      life: 0,
+      maxLife: 45 + Math.random() * 30
+    });
+  }
+
+  // Floating text badge
+  state.animations.floatingTexts.push({
+    x, y: y - 18,
+    text: badgeText,
+    color,
+    alpha: 1,
+    vy: -1.2,
+    life: 0
+  });
+}
+
+function spawnFlyingResource(hex, player, resource) {
+  // Flying cards are drawn in screen space, so convert the hex's world position to screen coords
+  const sx = state.camera.x + hex.x * state.camera.zoom;
+  const sy = state.camera.y + hex.y * state.camera.zoom;
+  const tx = window.innerWidth / 2 + (player.id - 1.5) * 85;
+  const ty = window.innerHeight - 35;
+
+  state.animations.flyingCards.push({
+    sx, sy, tx, ty,
+    x: sx, y: sy,
+    progress: 0,
+    resource,
+    color: player.color
+  });
+}
+
+// -------------------- ACTIONS & GAMEPLAY LOOP --------------------
+function placeSettlement(vertexId, playerId, isSetup) {
+  const v = state.vertices[vertexId];
+  const player = state.players[playerId];
+
+  if (!isSetup) {
+    payCost(player, BUILD_COSTS.settlement);
+  }
+
+  v.owner = playerId;
+  v.building = 'settlement';
+  state.lastBuiltVertex = v.id;
+
+  triggerLandTakeoverVFX(v.x, v.y, player.color, 'settlement', '+1 VP');
+  logEvent(`🏠 <strong style="color:${player.color}">${player.name}</strong> founded a Settlement.`);
+
+  if (isSetup && state.setupStep >= state.players.length) {
+    // 2nd settlement grants initial starting resources from adjacent hexes
+    v.hexIds.forEach(hId => {
+      const h = state.hexes[hId];
+      if (h.terrain !== 'desert') {
+        player.resources[h.terrain]++;
+        sfx.collectResource();
+        spawnFlyingResource(h, player, h.terrain);
+      }
+    });
+  }
+
+  updateLongestRoad();
+  checkVictoryCondition();
+  updateUI();
+  if (mp.enabled) broadcastGameState(state.phase);
+}
+
+function placeRoad(edgeId, playerId, isSetup) {
+  const e = state.edges[edgeId];
+  const player = state.players[playerId];
+
+  if (!isSetup && state.phase !== 'FREE_ROADS') {
+    payCost(player, BUILD_COSTS.road);
+  }
+
+  e.owner = playerId;
+  sfx.buildRoad();
+  logEvent(`🛣️ <strong style="color:${player.color}">${player.name}</strong> built a Road.`);
+
+  updateLongestRoad();
+  checkVictoryCondition();
+  updateUI();
+  if (mp.enabled) broadcastGameState(state.phase);
+}
+
+function upgradeToCity(vertexId, playerId) {
+  const v = state.vertices[vertexId];
+  const player = state.players[playerId];
+
+  payCost(player, BUILD_COSTS.city);
+  v.building = 'city';
+
+  triggerLandTakeoverVFX(v.x, v.y, player.color, 'city', '+2 VP (City)');
+  logEvent(`🏰 <strong style="color:${player.color}">${player.name}</strong> upgraded to a City!`);
+
+  checkVictoryCondition();
+  updateUI();
+  if (mp.enabled) broadcastGameState(state.phase);
+}
+
+function updateLongestRoad() {
+  // Simplified longest road tracker
+  state.players.forEach(p => {
+    const pRoads = state.edges.filter(e => e.owner === p.id).length;
+    p.longestRoad = pRoads;
+  });
+
+  let maxR = 4;
+  let leaderId = null;
+  state.players.forEach(p => {
+    if (p.longestRoad > maxR) {
+      maxR = p.longestRoad;
+      leaderId = p.id;
+    }
+  });
+
+  state.players.forEach(p => {
+    const had = p.hasLongestRoad;
+    p.hasLongestRoad = (p.id === leaderId);
+    if (!had && p.hasLongestRoad) {
+      logEvent(`👑 <strong style="color:${p.color}">${p.name}</strong> claimed the Longest Road (+2 VP)!`);
+    }
+  });
+}
+
+function updateLargestArmy() {
+  let maxK = 2;
+  let leaderId = null;
+  state.players.forEach(p => {
+    if (p.knightsPlayed > maxK) {
+      maxK = p.knightsPlayed;
+      leaderId = p.id;
+    }
+  });
+
+  state.players.forEach(p => {
+    const had = p.hasLargestArmy;
+    p.hasLargestArmy = (p.id === leaderId);
+    if (!had && p.hasLargestArmy) {
+      logEvent(`⚔️ <strong style="color:${p.color}">${p.name}</strong> claimed the Largest Army (+2 VP)!`);
+    }
+  });
+}
+
+// -------------------- DICE (animated) --------------------
+let diceAnimating = false;
+
+function drawDiceValues() {
+  if (state.config.balancedDice) {
+    // Balanced dice: draw from a shuffled "deck" of all 36 outcomes so results even out over time
+    if (!Array.isArray(state.diceBag) || state.diceBag.length < 6) {
+      const bag = [];
+      for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) bag.push([a, b]);
+      state.diceBag = shuffle(bag);
+    }
+    return state.diceBag.pop();
+  }
+  return [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
+}
+
+function showRollToast(total) {
+  const toast = document.getElementById('roll-toast');
+  const inner = toast.querySelector('.roll-toast-inner');
+  inner.textContent = total === 7 ? '🏴‍☠️ 7' : `🎲 ${total}`;
+  inner.style.color = total === 7 ? '#f87171' : '#fcd34d';
+  toast.classList.remove('show');
+  void toast.offsetWidth; // restart the animation
+  toast.classList.add('show');
+}
+
+// Purely visual: tumbles the dice, then lands on d1/d2 and calls onLand.
+function animateDice(d1, d2, onLand) {
+  const cubes = [document.getElementById('die-1'), document.getElementById('die-2')];
+  const totalBadge = document.getElementById('dice-total-badge');
+  diceAnimating = true;
+  updateUI();
+  cubes.forEach(c => {
+    c.classList.remove('dice-landed', 'dice-glow', 'dice-seven');
+    c.classList.add('dice-rolling');
+  });
+  totalBadge.textContent = '…';
+
+  let ticks = 0;
+  const shuffleFaces = setInterval(() => {
+    renderDiceFaces(1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6), false);
+    if (ticks++ % 2 === 0) sfx.diceClack();
+  }, 70);
+
+  setTimeout(() => {
+    clearInterval(shuffleFaces);
+    renderDiceFaces(d1, d2);
+    const total = d1 + d2;
+    cubes.forEach(c => {
+      c.classList.remove('dice-rolling');
+      void c.offsetWidth;
+      c.classList.add('dice-landed', total === 7 ? 'dice-seven' : 'dice-glow');
+    });
+    setTimeout(() => cubes.forEach(c => c.classList.remove('dice-glow', 'dice-seven')), 1600);
+    sfx.diceLand();
+    showRollToast(total);
+    diceAnimating = false;
+    if (onLand) onLand();
+    updateUI();
+  }, 950);
+}
+
+function rollDice(onDone) {
+  if (state.phase !== 'ROLL' || diceAnimating || state.gameOver) return false;
+  const [d1, d2] = drawDiceValues();
+  const gen = gameGeneration;
+  animateDice(d1, d2, () => {
+    if (gen !== gameGeneration || state.phase !== 'ROLL') return;
+    resolveRoll(d1, d2);
+    if (onDone) onDone();
+  });
+  return true;
+}
+
+function resolveRoll(d1, d2) {
+  state.dice = [d1, d2];
+  state.rollId = (state.rollId || 0) + 1;
+  const total = d1 + d2;
+  const curr = getCurrentPlayer();
+
+  if (total === 7) {
+    sfx.robberAlert();
+    logEvent(`🏴‍☠️ Rolled a <strong>7!</strong> The Bandit has been summoned.`);
+
+    const limit = state.config.discardLimit || 7;
+    state.players.forEach(p => {
+      const count = getTotalResources(p);
+      if (count > limit) {
+        const discardCount = Math.floor(count / 2);
+        for (let i = 0; i < discardCount; i++) {
+          const avail = RESOURCES.filter(r => p.resources[r] > 0);
+          if (avail.length > 0) {
+            const r = avail[Math.floor(Math.random() * avail.length)];
+            p.resources[r]--;
+          }
+        }
+        logEvent(`⚠️ <strong style="color:${p.color}">${p.name}</strong> discarded ${discardCount} cards to the Bandit (held ${count}, limit ${limit}).`);
+      }
+    });
+
+    state.robberReturnPhase = 'MAIN';
+    state.phase = 'MOVE_ROBBER';
+    updateUI();
+    if (mp.enabled) broadcastGameState();
+    if (curr.isAI && shouldRunAI()) aiTimeout(() => aiMoveRobber(curr), 600);
+    return;
+  }
+
+  let harvestedCount = 0;
+  state.hexes.forEach(h => {
+    if (h.number === total && !h.hasRobber && h.terrain !== 'desert') {
+      state.animations.hexPulses.push({ hexId: h.id, alpha: 1, color: TERRAIN_META[h.terrain].border });
+      state.vertices.forEach(v => {
+        if (v.owner !== null && v.hexIds.includes(h.id)) {
+          const owner = state.players[v.owner];
+          const yieldAmt = v.building === 'city' ? 2 : 1;
+          owner.resources[h.terrain] += yieldAmt;
+          harvestedCount += yieldAmt;
+          spawnFlyingResource(h, owner, h.terrain);
+        }
+      });
+    }
+  });
+
+  if (harvestedCount > 0) sfx.collectResource();
+  logEvent(`🎲 Rolled <strong class="text-amber-300">${total}</strong>. Resources distributed (${harvestedCount} total).`);
+  state.phase = 'MAIN';
+  updateUI();
+  if (mp.enabled) broadcastGameState();
+  if (curr.isAI && shouldRunAI()) aiTimeout(runAITurn, 650);
+}
+
+function moveRobberToHex(hexId) {
+  state.hexes.forEach(h => h.hasRobber = false);
+  const targetHex = state.hexes[hexId];
+  targetHex.hasRobber = true;
+
+  const thief = getCurrentPlayer();
+  triggerLandTakeoverVFX(targetHex.x, targetHex.y, '#1e293b', 'settlement', '🏴‍☠️ BLOCKED');
+
+  const victims = getHexVictims(targetHex, thief.id).filter(v => getTotalResources(v) > 0
+    && !(state.config.friendlyRobber && calculatePlayerVP(v) <= 2));
+  if (victims.length > 0) {
+    const victim = victims[Math.floor(Math.random() * victims.length)];
+    const pool = [];
+    RESOURCES.forEach(r => {
+      for (let k = 0; k < victim.resources[r]; k++) pool.push(r);
+    });
+    const stolen = pool[Math.floor(Math.random() * pool.length)];
+    victim.resources[stolen]--;
+    thief.resources[stolen]++;
+    spawnFlyingResource(targetHex, thief, stolen);
+    logEvent(`🏴‍☠️ <strong style="color:${thief.color}">${thief.name}</strong> plundered 1 resource from <strong style="color:${victim.color}">${victim.name}</strong>!`);
+  } else {
+    logEvent(`🏴‍☠️ <strong style="color:${thief.color}">${thief.name}</strong> moved the Bandit to ${TERRAIN_META[targetHex.terrain].label}.`);
+  }
+
+  state.phase = state.robberReturnPhase || 'MAIN';
+  state.robberReturnPhase = 'MAIN';
+  updateUI();
+  if (mp.enabled) broadcastGameState(state.phase);
+}
+
+function getHexVictims(hex, excludePlayerId) {
+  const ids = new Set();
+  state.vertices.forEach(v => {
+    if (v.owner !== null && v.owner !== excludePlayerId && v.hexIds.includes(hex.id)) {
+      ids.add(v.owner);
+    }
+  });
+  return [...ids].map(id => state.players[id]);
+}
+
+function advanceTurn() {
+  if (state.gameOver) return;
+  state.buildMode = null;
+  state.devPlayedThisTurn = false;
+
+  if (state.phase === 'SETUP_SETTLEMENT' || state.phase === 'SETUP_ROAD') {
+    state.setupStep++;
+    if (state.setupStep >= state.setupOrder.length) {
+      state.currentPlayerIdx = 0;
+      state.phase = 'ROLL';
+      state.buildMode = null;
+      logEvent(`⚔️ Founding complete! <strong>${getCurrentPlayer().name}</strong> begins Turn 1.`);
+    } else {
+      state.currentPlayerIdx = state.setupOrder[state.setupStep];
+      state.phase = 'SETUP_SETTLEMENT';
+      state.buildMode = 'settlement';
+    }
+  } else {
+    state.currentPlayerIdx = (state.currentPlayerIdx + 1) % state.players.length;
+    if (state.currentPlayerIdx === 0) state.turn++;
+    state.phase = 'ROLL';
+  }
+
+  startTurnClock();
+  updateUI();
+  if (mp.enabled) broadcastGameState(state.phase);
+  if (getCurrentPlayer().isAI && !state.gameOver && shouldRunAI()) {
+    aiTimeout(runAITurn, 600);
+  }
+}
+
+function checkVictoryCondition() {
+  for (const p of state.players) {
+    const totalVP = calculatePlayerVP(p, true);
+    if (totalVP >= state.config.vpTarget) {
+      state.gameOver = true;
+      state.phase = 'GAME_OVER';
+      sfx.victory();
+      showVictoryModal(p);
+      return true;
+    }
+  }
+  return false;
+}
+
+// -------------------- FRIENDLY ROBBER --------------------
+function hexTouchesProtectedPlayer(hex, thiefId) {
+  return state.vertices.some(v => v.owner !== null && v.owner !== thiefId && v.hexIds.includes(hex.id)
+    && calculatePlayerVP(state.players[v.owner]) <= 2);
+}
+function isRobberHexAllowed(hex, thiefId) {
+  if (!hex || hex.hasRobber) return false;
+  if (!state.config.friendlyRobber || !hexTouchesProtectedPlayer(hex, thiefId)) return true;
+  // If every other tile is protected, any move is allowed
+  return !state.hexes.some(h => !h.hasRobber && !hexTouchesProtectedPlayer(h, thiefId));
+}
+
+// -------------------- TURN TIMER --------------------
+function startTurnClock() {
+  const c = getCurrentPlayer();
+  const secs = Number(state.config.turnSeconds) || 0;
+  state.turnDeadline = (secs > 0 && c && !c.isAI && !state.gameOver) ? Date.now() + secs * 1000 : null;
+}
+
+let autoFinishing = false;
+let lastTickSecond = null;
+
+// When time runs out, finish the turn the way a sensible player would.
+function autoFinishTurn() {
+  const p = getCurrentPlayer();
+  if (autoFinishing || state.gameOver || !p || p.isAI || diceAnimating) return;
+  autoFinishing = true;
+  if (p.id === localSeat()) {
+    sfx.timeUp();
+    ['modal-trade', 'modal-resource-picker'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  }
+  state.buildMode = null;
+  logEvent(`⏱ <strong style="color:${p.color}">${p.name}</strong> ran out of time.`);
+
+  const step = (guard) => {
+    if (guard > 10 || state.gameOver || getCurrentPlayer() !== p) { autoFinishing = false; return; }
+    switch (state.phase) {
+      case 'SETUP_SETTLEMENT': {
+        const valid = state.vertices.filter(v => isValidSettlementVertex(v, p.id, true))
+          .sort((a, b) => scoreVertexForSettlement(b, p) - scoreVertexForSettlement(a, p));
+        if (valid[0]) placeSettlement(valid[0].id, p.id, true);
+        state.phase = 'SETUP_ROAD';
+        state.buildMode = 'road';
+        return step(guard + 1);
+      }
+      case 'SETUP_ROAD': {
+        const e = state.edges.find(e => isValidRoadEdge(e, p.id, true));
+        if (e) placeRoad(e.id, p.id, true);
+        autoFinishing = false;
+        return advanceTurn();
+      }
+      case 'ROLL':
+        if (!rollDice(() => step(guard + 1))) autoFinishing = false;
+        return;
+      case 'MOVE_ROBBER': {
+        const options = state.hexes.filter(h => !h.hasRobber && isRobberHexAllowed(h, p.id));
+        const target = options.find(h => !state.vertices.some(v => v.owner === p.id && v.hexIds.includes(h.id))) || options[0];
+        if (target) moveRobberToHex(target.id);
+        else state.phase = state.robberReturnPhase || 'MAIN';
+        return step(guard + 1);
+      }
+      case 'FREE_ROADS':
+        state.freeRoadsLeft = 0;
+        state.phase = 'MAIN';
+        return step(guard + 1);
+      case 'MAIN':
+        autoFinishing = false;
+        return advanceTurn();
+      default:
+        autoFinishing = false;
+    }
+  };
+  step(0);
+}
+
+function tickTurnTimer() {
+  const el = document.getElementById('turn-timer');
+  if (!el) return;
+  const c = getCurrentPlayer();
+  if (!state.turnDeadline || state.gameOver || !c || c.isAI) {
+    el.classList.add('hidden');
+    lastTickSecond = null;
+    return;
+  }
+  const msLeft = state.turnDeadline - Date.now();
+  const secsLeft = Math.max(0, Math.ceil(msLeft / 1000));
+  el.classList.remove('hidden');
+  el.textContent = `⏱ ${Math.floor(secsLeft / 60)}:${String(secsLeft % 60).padStart(2, '0')}`;
+  const urgent = secsLeft <= 10;
+  el.classList.toggle('text-sky-300', !urgent);
+  el.classList.toggle('text-rose-300', urgent);
+  el.classList.toggle('border-rose-500', urgent);
+  el.classList.toggle('timer-urgent', urgent);
+
+  if (isLocalTurn() && secsLeft <= 5 && secsLeft > 0 && lastTickSecond !== secsLeft) {
+    sfx.timerTick(secsLeft <= 3);
+  }
+  lastTickSecond = secsLeft;
+
+  if (msLeft <= 0) {
+    if (isLocalTurn()) {
+      autoFinishTurn();
+    } else if (mp.enabled && mp.isHost && msLeft < -5000) {
+      // The player whose turn it is seems to have dropped out: the host finishes it for them
+      autoFinishTurn();
+    }
+  }
+}
+setInterval(tickTurnTimer, 250);
+
+// "Your turn" fanfare + title flash when the turn passes to this browser's player
+let lastAnnouncedTurnKey = null;
+function announceTurnIfNeeded() {
+  if (!isLocalTurn()) return;
+  const key = `${gameGeneration}|${state.turn}|${state.currentPlayerIdx}|${state.setupStep}`;
+  if (key === lastAnnouncedTurnKey) return;
+  lastAnnouncedTurnKey = key;
+  sfx.yourTurn();
+  const banner = document.getElementById('turn-banner');
+  banner.classList.remove('your-turn-flash');
+  void banner.offsetWidth;
+  banner.classList.add('your-turn-flash');
+  if (document.hidden) document.title = '⚔️ Your turn! — Terra Hex';
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) document.title = 'Terra Hex — Hexagonal Empire Strategy';
+});
+
+// -------------------- 8. DEVELOPMENT CARDS & TRADE --------------------
+function buyDevCard() {
+  const player = getCurrentPlayer();
+  if (state.phase !== 'MAIN' || state.devDeck.length === 0 || !canAfford(player, BUILD_COSTS.dev)) return;
+
+  payCost(player, BUILD_COSTS.dev);
+  const card = state.devDeck.pop();
+  card.boughtTurn = state.turn;
+  card.boughtBy = player.id;
+  player.devCards.push(card);
+
+  sfx.collectResource();
+  logEvent(`📜 <strong style="color:${player.color}">${player.name}</strong> acquired a Development Card.`);
+  checkVictoryCondition();
+  updateUI();
+  if (mp.enabled) broadcastGameState(state.phase);
+}
+
+function playDevCard(cardId) {
+  const player = getCurrentPlayer();
+  const card = player.devCards.find(c => c.id === cardId && !c.played);
+  if (!canPlayDevCard(player, card)) return;
+
+  card.played = true;
+  state.devPlayedThisTurn = true;
+
+  if (card.type === 'knight') {
+    player.knightsPlayed++;
+    updateLargestArmy();
+    checkVictoryCondition();
+    if (!state.gameOver) {
+      state.robberReturnPhase = state.phase; // ROLL if played before rolling
+      state.phase = 'MOVE_ROBBER';
+      sfx.robberAlert();
+      logEvent(`⚔️ <strong style="color:${player.color}">${player.name}</strong> deployed a <strong>Knight</strong>!`);
+      updateUI();
+      if (player.isAI) aiTimeout(() => aiMoveRobber(player), 600);
+    }
+  } else if (card.type === 'roadBuilder') {
+    state.freeRoadsLeft = 2;
+    state.phase = 'FREE_ROADS';
+    state.buildMode = 'road';
+    if (!state.edges.some(e => isValidRoadEdge(e, player.id, false))) {
+      state.freeRoadsLeft = 0;
+      state.phase = 'MAIN';
+      state.buildMode = null;
+    }
+    logEvent(`🛣️ <strong style="color:${player.color}">${player.name}</strong> played <strong>Road Building</strong>!`);
+    updateUI();
+  } else if (card.type === 'yearPlenty') {
+    if (player.isAI) {
+      RESOURCES.slice(0, 2).forEach(r => player.resources[r]++);
+      logEvent(`🌽 <strong style="color:${player.color}">${player.name}</strong> played <strong>Year of Plenty</strong>!`);
+      updateUI();
+    } else {
+      openResourcePicker('Year of Plenty (Pick 1st Resource)', 'Gain 2 resources from the supply.', (res1) => {
+        player.resources[res1]++;
+        openResourcePicker('Year of Plenty (Pick 2nd Resource)', 'Gain 1 more resource.', (res2) => {
+          player.resources[res2]++;
+          logEvent(`🌽 <strong>${player.name}</strong> harvested ${res1} & ${res2} via Year of Plenty.`);
+          updateUI();
+          if (mp.enabled) broadcastGameState(state.phase);
+        });
+      });
+    }
+  } else if (card.type === 'monopoly') {
+    const executeMonopoly = (res) => {
+      let totalTaken = 0;
+      state.players.forEach(opp => {
+        if (opp.id !== player.id) {
+          totalTaken += opp.resources[res];
+          opp.resources[res] = 0;
+        }
+      });
+      player.resources[res] += totalTaken;
+      sfx.claimLand();
+      logEvent(`💰 <strong style="color:${player.color}">${player.name}</strong> monopolized <strong>${res.toUpperCase()}</strong> (+${totalTaken})!`);
+      updateUI();
+      if (mp.enabled) broadcastGameState(state.phase);
+    };
+
+    if (player.isAI) {
+      executeMonopoly('ore');
+    } else {
+      openResourcePicker('Monopoly', 'Seize all cards of one resource type from opponents.', executeMonopoly);
+    }
+  }
+  if (mp.enabled) broadcastGameState(state.phase);
+}
+
+function getPlayerTradeRatio(playerId, resource) {
+  let ratio = 4;
+  state.vertices.forEach(v => {
+    if (v.owner === playerId && v.port) {
+      if (v.port.type === resource) ratio = Math.min(ratio, 2);
+      else if (v.port.type === '3:1') ratio = Math.min(ratio, 3);
+    }
+  });
+  return ratio;
+}
+
+// -------------------- 9. SMART AI ENGINE --------------------
+function scoreVertexForSettlement(v, player) {
+  let score = 0;
+  const seenTerrains = new Set();
+  v.hexIds.forEach(hId => {
+    const h = state.hexes[hId];
+    if (h.terrain !== 'desert') {
+      score += (PIP_DOTS[h.number] || 0) * 2.2;
+      if (!seenTerrains.has(h.terrain)) {
+        score += 3.5;
+        seenTerrains.add(h.terrain);
+      }
+      if ((player.resources[h.terrain] || 0) === 0) score += 2.0;
+    }
+  });
+  if (v.port) score += 2.5;
+  return score;
+}
+
+function runAITurn() {
+  if (state.gameOver) return;
+  const ai = getCurrentPlayer();
+  if (!ai.isAI) return;
+
+  if (state.phase === 'SETUP_SETTLEMENT') {
+    const valid = state.vertices.filter(v => isValidSettlementVertex(v, ai.id, true));
+    valid.sort((a, b) => scoreVertexForSettlement(b, ai) - scoreVertexForSettlement(a, ai));
+    if (valid.length > 0) {
+      placeSettlement(valid[0].id, ai.id, true);
+      state.phase = 'SETUP_ROAD';
+      updateUI();
+      if (mp.enabled) broadcastGameState(state.phase);
+      aiTimeout(runAITurn, 480);
+    }
+    return;
+  }
+
+  if (state.phase === 'SETUP_ROAD') {
+    const validEdges = state.edges.filter(e => isValidRoadEdge(e, ai.id, true));
+    if (validEdges.length > 0) {
+      const choice = validEdges[Math.floor(Math.random() * validEdges.length)];
+      placeRoad(choice.id, ai.id, true);
+    }
+    aiTimeout(advanceTurn, 480);
+    return;
+  }
+
+  if (state.phase === 'ROLL') {
+    const blockedOwn = state.hexes.some(h => h.hasRobber && state.vertices.some(v => v.owner === ai.id && v.hexIds.includes(h.id)));
+    const knightCard = ai.devCards.find(c => c.type === 'knight' && !c.played);
+    if (blockedOwn && knightCard && canPlayDevCard(ai, knightCard)) {
+      playDevCard(knightCard.id);
+      return;
+    }
+    // resolveRoll continues the AI turn once the dice land; if another roll is still animating, try again shortly
+    if (!rollDice()) aiTimeout(runAITurn, 300);
+    return;
+  }
+
+  if (state.phase === 'MOVE_ROBBER') {
+    aiMoveRobber(ai);
+    return;
+  }
+
+  if (state.phase === 'MAIN') {
+    for (const giveRes of RESOURCES) {
+      const ratio = getPlayerTradeRatio(ai.id, giveRes);
+      if (ai.resources[giveRes] >= ratio + 1) {
+        const needed = RESOURCES.reduce((a, b) => ai.resources[a] < ai.resources[b] ? a : b);
+        if (needed !== giveRes) {
+          ai.resources[giveRes] -= ratio;
+          ai.resources[needed] += 1;
+          logEvent(`⚖️ <strong style="color:${ai.color}">${ai.name}</strong> traded ${ratio} ${giveRes} for 1 ${needed}.`);
+        }
+      }
+    }
+
+    if (canAfford(ai, BUILD_COSTS.city)) {
+      const ownSettlements = state.vertices.filter(v => v.owner === ai.id && v.building === 'settlement');
+      if (ownSettlements.length > 0) {
+        ownSettlements.sort((a, b) => scoreVertexForSettlement(b, ai) - scoreVertexForSettlement(a, ai));
+        upgradeToCity(ownSettlements[0].id, ai.id);
+        if (!state.gameOver) aiTimeout(runAITurn, 500);
+        return;
+      }
+    }
+
+    if (canAfford(ai, BUILD_COSTS.settlement)) {
+      const validV = state.vertices.filter(v => isValidSettlementVertex(v, ai.id, false));
+      if (validV.length > 0) {
+        validV.sort((a, b) => scoreVertexForSettlement(b, ai) - scoreVertexForSettlement(a, ai));
+        placeSettlement(validV[0].id, ai.id, false);
+        if (!state.gameOver) aiTimeout(runAITurn, 500);
+        return;
+      }
+    }
+
+    if (canAfford(ai, BUILD_COSTS.road)) {
+      const validE = state.edges.filter(e => isValidRoadEdge(e, ai.id, false));
+      const ownRoadsCount = state.edges.filter(e => e.owner === ai.id).length;
+      if (validE.length > 0 && ownRoadsCount < 11) {
+        validE.sort((a, b) => {
+          const scoreEdge = (e) => {
+            const v1 = state.vertices[e.v1], v2 = state.vertices[e.v2];
+            return (isValidSettlementVertex(v1, ai.id, true) ? scoreVertexForSettlement(v1, ai) : 0) +
+                   (isValidSettlementVertex(v2, ai.id, true) ? scoreVertexForSettlement(v2, ai) : 0);
+          };
+          return scoreEdge(b) - scoreEdge(a);
+        });
+        placeRoad(validE[0].id, ai.id, false);
+        if (!state.gameOver) aiTimeout(runAITurn, 450);
+        return;
+      }
+    }
+
+    if (canAfford(ai, BUILD_COSTS.dev) && state.devDeck.length > 0) {
+      buyDevCard();
+      if (!state.gameOver) aiTimeout(runAITurn, 450);
+      return;
+    }
+
+    aiTimeout(advanceTurn, 500);
+  }
+}
+
+function aiMoveRobber(ai) {
+  let bestHex = null;
+  let bestScore = -Infinity;
+
+  state.hexes.forEach(h => {
+    if (!isRobberHexAllowed(h, ai.id)) return;
+    let score = (PIP_DOTS[h.number] || 0) * 1.2;
+    state.vertices.forEach(v => {
+      if (v.owner === null || !v.hexIds.includes(h.id)) return;
+      if (v.owner === ai.id) score -= 50;
+      else score += 4 + calculatePlayerVP(state.players[v.owner]) * 1.5;
+    });
+    if (h.terrain === 'desert') score -= 5;
+    if (score > bestScore) {
+      bestScore = score;
+      bestHex = h;
+    }
+  });
+
+  if (!bestHex) bestHex = state.hexes.find(h => !h.hasRobber) || state.hexes[0];
+  moveRobberToHex(bestHex.id);
+  if (!state.gameOver && ai.isAI) aiTimeout(runAITurn, 550);
+}
+
+// -------------------- 10. CANVAS RENDERING ENGINE --------------------
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function centerCamera() {
+  const pts = [...state.hexes, ...(state.waterHexes || [])];
+  const S = state.hexSize;
+  let minX = -S, maxX = S, minY = -S, maxY = S;
+  if (pts.length) {
+    minX = Math.min(...pts.map(p => p.x)) - S * 1.6;
+    maxX = Math.max(...pts.map(p => p.x)) + S * 1.6;
+    minY = Math.min(...pts.map(p => p.y)) - S * 1.6;
+    maxY = Math.max(...pts.map(p => p.y)) + S * 1.6;
+  }
+  const w = window.innerWidth, h = window.innerHeight;
+  const topUi = 120, bottomUi = w < 640 ? 210 : 190;
+  const sideUi = w >= 1024 ? 300 : 20;
+  const availW = Math.max(200, w - sideUi * 2);
+  const availH = Math.max(200, h - topUi - bottomUi);
+  const zoom = Math.max(0.35, Math.min(1.3, availW / (maxX - minX), availH / (maxY - minY)));
+  state.camera.zoom = zoom;
+  state.camera.x = w / 2 - ((minX + maxX) / 2) * zoom;
+  state.camera.y = topUi + availH / 2 - ((minY + maxY) / 2) * zoom;
+}
+
+function drawHexagonPath(x, y, radius) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 180) * (60 * i - 30);
+    const px = x + radius * Math.cos(angle);
+    const py = y + radius * Math.sin(angle);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+// Keep the loop alive even if a single frame throws, so one bad draw can't blank the board.
+function renderLoop(timestamp) {
+  try {
+    drawFrame(timestamp);
+  } catch (err) {
+    console.error('Render frame error:', err);
+    try { ctx.restore(); } catch (_) {}
+    ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+  }
+  requestAnimationFrame(renderLoop);
+}
+
+function drawFrame(timestamp) {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  ctx.clearRect(0, 0, w, h);
+
+  const waveTime = timestamp * 0.0012;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 6; i++) {
+    const r = 140 + i * 95 + Math.sin(waveTime + i) * 8;
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(state.camera.x, state.camera.y);
+  ctx.scale(state.camera.zoom, state.camera.zoom);
+
+  (state.waterHexes || []).forEach(w => {
+    drawHexagonPath(w.x, w.y, state.hexSize - 1.5);
+    const g = ctx.createRadialGradient(w.x - 8, w.y - 10, 4, w.x, w.y, state.hexSize);
+    g.addColorStop(0, '#0e7490');
+    g.addColorStop(1, '#0c4a6e');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+    ctx.stroke();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.35)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let k = -1; k <= 1; k++) {
+      const yy = w.y + k * state.hexSize * 0.28 + Math.sin(timestamp * 0.002 + k + w.x) * 2;
+      ctx.beginPath();
+      ctx.moveTo(w.x - state.hexSize * 0.35, yy);
+      ctx.quadraticCurveTo(w.x - state.hexSize * 0.12, yy - 5, w.x, yy);
+      ctx.quadraticCurveTo(w.x + state.hexSize * 0.12, yy + 5, w.x + state.hexSize * 0.35, yy);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+
+  state.hexes.forEach(hex => {
+    drawHexagonPath(hex.x, hex.y + 6, state.hexSize + 9);
+    ctx.fillStyle = 'rgba(6, 18, 36, 0.55)';
+    ctx.fill();
+
+    drawHexagonPath(hex.x, hex.y, state.hexSize + 6);
+    ctx.fillStyle = 'rgba(14, 116, 144, 0.25)';
+    ctx.fill();
+  });
+
+  state.edges.forEach(edge => {
+    const v1 = state.vertices[edge.v1];
+    if (v1.port && v1.port.edgeId === edge.id) {
+      const v2 = state.vertices[edge.v2];
+      const home = state.hexes[edge.hexId] || { x: 0, y: 0 };
+      const len = Math.hypot(edge.x - home.x, edge.y - home.y) || 1;
+      const nx = (edge.x - home.x) / len;
+      const ny = (edge.y - home.y) / len;
+      const px = edge.x + nx * 28;
+      const py = edge.y + ny * 28;
+
+      ctx.strokeStyle = '#92400e';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(v1.x, v1.y);
+      ctx.lineTo(px, py);
+      ctx.lineTo(v2.x, v2.y);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(px, py, 14, 0, Math.PI * 2);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.stroke();
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 9px "Plus Jakarta Sans", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const label = v1.port.type === '3:1' ? '3:1' : `${TERRAIN_META[v1.port.type].icon}2:1`;
+      ctx.fillText(label, px, py);
+    }
+  });
+
+  state.hexes.forEach(hex => {
+    const meta = TERRAIN_META[hex.terrain];
+
+    drawHexagonPath(hex.x, hex.y + 4, state.hexSize - 1);
+    ctx.fillStyle = '#090d16';
+    ctx.fill();
+
+    drawHexagonPath(hex.x, hex.y, state.hexSize - 1.5);
+    const grad = ctx.createRadialGradient(hex.x - 10, hex.y - 12, 4, hex.x, hex.y, state.hexSize);
+    grad.addColorStop(0, meta.color1);
+    grad.addColorStop(1, meta.color2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.06)';
+    ctx.fill();
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.stroke();
+
+    if (state.showTerritory) {
+      const owners = {};
+      state.vertices.forEach(v => {
+        if (v.owner !== null && v.hexIds.includes(hex.id)) {
+          owners[v.owner] = (owners[v.owner] || 0) + (v.building === 'city' ? 2 : 1);
+        }
+      });
+      let dominantId = null, maxInf = 0;
+      Object.entries(owners).forEach(([pid, inf]) => {
+        if (inf > maxInf) { maxInf = inf; dominantId = parseInt(pid, 10); }
+      });
+      if (dominantId !== null && state.players[dominantId]) {
+        const pColor = state.players[dominantId].color;
+        drawHexagonPath(hex.x, hex.y, state.hexSize - 3);
+        ctx.fillStyle = hexToRgba(pColor, 0.16);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = hexToRgba(pColor, 0.5);
+        ctx.stroke();
+      }
+    }
+
+    if (state.phase === 'MOVE_ROBBER' && state.hoveredHex === hex.id && isLocalTurn() && isRobberHexAllowed(hex, localSeat())) {
+      drawHexagonPath(hex.x, hex.y, state.hexSize - 3);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.35)';
+      ctx.fill();
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#ef4444';
+      ctx.stroke();
+    }
+
+    const pulse = state.animations.hexPulses.find(p => p.hexId === hex.id);
+    if (pulse) {
+      drawHexagonPath(hex.x, hex.y, state.hexSize - 2);
+      ctx.fillStyle = hexToRgba(pulse.color, pulse.alpha * 0.45);
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = hexToRgba(pulse.color, pulse.alpha);
+      ctx.stroke();
+    }
+
+    // Resource label badge: solid icon + name so tile types read clearly at a glance
+    const S = state.hexSize;
+    const badgeY = hex.number ? hex.y - S * 0.36 : hex.y - S * 0.08;
+    const iconFont = `${Math.round(S * 0.32)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+    const labelFont = `800 ${Math.max(9, Math.round(S * 0.2))}px "Plus Jakarta Sans", sans-serif`;
+    const labelText = meta.resName === 'None' ? meta.label : meta.resName;
+    ctx.save();
+    ctx.font = iconFont;
+    const iconW = ctx.measureText(meta.icon).width;
+    ctx.font = labelFont;
+    const labelW = ctx.measureText(labelText).width;
+    const padX = S * 0.1, gap = S * 0.06;
+    const pillH = S * 0.4;
+    const pillW = padX * 2 + iconW + gap + labelW;
+    const pillX = hex.x - pillW / 2;
+    const pillY = badgeY - pillH / 2;
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(pillX, pillY, pillW, pillH, pillH / 2);
+    else ctx.rect(pillX, pillY, pillW, pillH);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = hexToRgba(meta.color1, 0.28);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = meta.color2;
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = iconFont;
+    ctx.fillStyle = '#000000'; // emoji inherit fill alpha — keep them fully opaque
+    ctx.fillText(meta.icon, pillX + padX, badgeY + S * 0.01);
+    ctx.font = labelFont;
+    ctx.fillStyle = meta.color2;
+    ctx.fillText(labelText, pillX + padX + iconW + gap, badgeY + S * 0.015);
+    ctx.restore();
+
+    if (hex.number) {
+      const isHot = hex.number === 6 || hex.number === 8;
+      const chipY = hex.y + S * 0.2;
+      const chipR = S * 0.25;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 5;
+      ctx.shadowOffsetY = 2;
+      ctx.beginPath();
+      ctx.arc(hex.x, chipY, chipR, 0, Math.PI * 2);
+      ctx.fillStyle = '#fef3c7';
+      ctx.fill();
+      ctx.restore();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = isHot ? '#dc2626' : '#78350f';
+      ctx.stroke();
+
+      ctx.fillStyle = isHot ? '#dc2626' : '#0f172a';
+      ctx.font = `800 ${Math.round(S * 0.23)}px "Plus Jakarta Sans", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(hex.number, hex.x, chipY - S * 0.035);
+
+      const dots = PIP_DOTS[hex.number] || 1;
+      const dotSpacing = S * 0.06;
+      const startX = hex.x - ((dots - 1) * dotSpacing) / 2;
+      for (let d = 0; d < dots; d++) {
+        ctx.beginPath();
+        ctx.arc(startX + d * dotSpacing, chipY + S * 0.14, S * 0.022, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (hex.hasRobber) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      const rX = hex.x + state.hexSize * 0.52, rY = hex.y + state.hexSize * 0.2;
+      ctx.arc(rX, rY, state.hexSize * 0.22, 0, Math.PI * 2);
+      ctx.fillStyle = '#090d16';
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#ef4444';
+      ctx.stroke();
+      ctx.font = '13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `${Math.round(state.hexSize * 0.24)}px sans-serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('🏴‍☠️', rX, rY + 0.5);
+      ctx.restore();
+    }
+  });
+
+  state.animations.hexPulses = state.animations.hexPulses.filter(p => {
+    if (!state.hexes[p.hexId]) return false;
+    p.alpha -= 0.022;
+    return p.alpha > 0;
+  });
+
+  const currPlayer = getCurrentPlayer();
+  const isHumanTurn = isLocalTurn();
+  const mySeat = localSeat();
+  const showRoadSlots = isHumanTurn && (state.phase === 'SETUP_ROAD' || state.phase === 'FREE_ROADS' || (state.phase === 'MAIN' && state.buildMode === 'road'));
+
+  state.edges.forEach(edge => {
+    const v1 = state.vertices[edge.v1];
+    const v2 = state.vertices[edge.v2];
+
+    if (edge.owner !== null && state.players[edge.owner]) {
+      const p = state.players[edge.owner];
+      ctx.save();
+      ctx.lineCap = 'round';
+
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.78)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 4;
+
+      ctx.beginPath();
+      ctx.moveTo(v1.x, v1.y);
+      ctx.lineTo(v2.x, v2.y);
+      ctx.lineWidth = 17;
+      ctx.strokeStyle = '#070b14';
+      ctx.stroke();
+
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      ctx.beginPath();
+      ctx.moveTo(v1.x, v1.y);
+      ctx.lineTo(v2.x, v2.y);
+      ctx.lineWidth = 13.5;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.88)';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(v1.x, v1.y);
+      ctx.lineTo(v2.x, v2.y);
+      ctx.lineWidth = 11;
+      ctx.strokeStyle = p.color;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(v1.x, v1.y);
+      ctx.lineTo(v2.x, v2.y);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.48)';
+      ctx.stroke();
+
+      ctx.restore();
+    } else if (showRoadSlots && isValidRoadEdge(edge, mySeat, state.phase === 'SETUP_ROAD')) {
+      const isHover = state.hoveredEdge === edge.id;
+      const pulse = 0.65 + 0.35 * Math.sin(timestamp * 0.007);
+
+      ctx.save();
+      ctx.lineCap = 'round';
+
+      if (isHover) {
+        ctx.shadowColor = '#fde047';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.moveTo(v1.x, v1.y);
+        ctx.lineTo(v2.x, v2.y);
+        ctx.lineWidth = 16;
+        ctx.strokeStyle = '#090d16';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(v1.x, v1.y);
+        ctx.lineTo(v2.x, v2.y);
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = currPlayer.color;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(v1.x, v1.y);
+        ctx.lineTo(v2.x, v2.y);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#fef08a';
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(v1.x, v1.y);
+        ctx.lineTo(v2.x, v2.y);
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = `rgba(9, 13, 22, ${0.75 * pulse})`;
+        ctx.stroke();
+
+        ctx.setLineDash([7, 6]);
+        ctx.lineDashOffset = -timestamp * 0.025;
+        ctx.beginPath();
+        ctx.moveTo(v1.x, v1.y);
+        ctx.lineTo(v2.x, v2.y);
+        ctx.lineWidth = 7.5;
+        ctx.strokeStyle = `rgba(253, 224, 71, ${pulse})`;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  });
+
+  const showSettlementSlots = isHumanTurn && (state.phase === 'SETUP_SETTLEMENT' || (state.phase === 'MAIN' && state.buildMode === 'settlement'));
+  const showCitySlots = isHumanTurn && state.phase === 'MAIN' && state.buildMode === 'city';
+
+  const drawSettlementPiece = (x, y, color, isGhost = false) => {
+    ctx.save();
+    if (isGhost) ctx.globalAlpha = 0.88;
+
+    ctx.beginPath();
+    ctx.arc(x, y + 2, 18.5, 0, Math.PI * 2);
+    ctx.fillStyle = hexToRgba(color, 0.28);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = hexToRgba(color, 0.85);
+    ctx.stroke();
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 5;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y - 17);
+    ctx.lineTo(x + 15, y - 4);
+    ctx.lineTo(x + 12, y - 4);
+    ctx.lineTo(x + 12, y + 12);
+    ctx.lineTo(x - 12, y + 12);
+    ctx.lineTo(x - 12, y - 4);
+    ctx.lineTo(x - 15, y - 4);
+    ctx.closePath();
+
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.lineWidth = 4.5;
+    ctx.strokeStyle = '#070b14';
+    ctx.stroke();
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = isGhost ? '#fde047' : '#ffffff';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x, y - 15.5);
+    ctx.lineTo(x + 12, y - 4);
+    ctx.lineTo(x - 12, y - 4);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.26)';
+    ctx.fill();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(x - 2.5, y + 3, 5, 7.5);
+
+    ctx.restore();
+  };
+
+  const drawCityPiece = (x, y, color, isGhost = false) => {
+    ctx.save();
+    if (isGhost) ctx.globalAlpha = 0.88;
+
+    ctx.beginPath();
+    ctx.arc(x, y + 2, 23, 0, Math.PI * 2);
+    ctx.fillStyle = hexToRgba(color, 0.34);
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#fde047';
+    ctx.stroke();
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 6;
+
+    ctx.beginPath();
+    ctx.moveTo(x - 17, y + 14);
+    ctx.lineTo(x - 17, y - 10);
+    ctx.lineTo(x - 13, y - 10);
+    ctx.lineTo(x - 13, y - 7);
+    ctx.lineTo(x - 9, y - 7);
+    ctx.lineTo(x - 9, y - 10);
+    ctx.lineTo(x - 5, y - 10);
+    ctx.lineTo(x - 5, y - 4);
+    ctx.lineTo(x - 1, y - 4);
+    ctx.lineTo(x - 1, y - 16);
+    ctx.lineTo(x + 7, y - 22);
+    ctx.lineTo(x + 15, y - 16);
+    ctx.lineTo(x + 15, y - 9);
+    ctx.lineTo(x + 17, y - 9);
+    ctx.lineTo(x + 17, y + 14);
+    ctx.closePath();
+
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#070b14';
+    ctx.stroke();
+
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = '#fde047';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x - 1, y - 15.5);
+    ctx.lineTo(x + 7, y - 21);
+    ctx.lineTo(x + 15, y - 15.5);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.fill();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(x - 12.5, y - 2, 3.5, 5);
+    ctx.fillRect(x + 4.5, y - 10, 4, 5.5);
+    ctx.fillRect(x + 4.5, y + 1, 4, 5.5);
+
+    ctx.restore();
+  };
+
+  state.vertices.forEach(v => {
+    if (v.owner !== null && state.players[v.owner]) {
+      const p = state.players[v.owner];
+
+      if (v.building === 'settlement') {
+        drawSettlementPiece(v.x, v.y, p.color, false);
+      } else if (v.building === 'city') {
+        drawCityPiece(v.x, v.y, p.color, false);
+      }
+
+      if (showCitySlots && v.owner === mySeat && v.building === 'settlement') {
+        const isHover = state.hoveredVertex === v.id;
+        const pulse = 0.65 + 0.35 * Math.sin(timestamp * 0.007);
+        if (isHover) {
+          drawCityPiece(v.x, v.y, p.color, true);
+        } else {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(v.x, v.y, 21 + pulse * 3, 0, Math.PI * 2);
+          ctx.strokeStyle = '#070b14';
+          ctx.lineWidth = 5;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(v.x, v.y, 21 + pulse * 3, 0, Math.PI * 2);
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    } else if (showSettlementSlots && isValidSettlementVertex(v, mySeat, state.phase === 'SETUP_SETTLEMENT')) {
+      const isHover = state.hoveredVertex === v.id;
+      const pulse = 0.65 + 0.35 * Math.sin(timestamp * 0.007);
+      const humanColor = currPlayer.color;
+
+      if (isHover) {
+        drawSettlementPiece(v.x, v.y, humanColor, true);
+      } else {
+        ctx.save();
+        const outerR = 13 + pulse * 3.5;
+
+        ctx.beginPath();
+        ctx.arc(v.x, v.y, outerR + 4, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(253, 224, 71, ${0.24 * pulse})`;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(v.x, v.y, outerR, 0, Math.PI * 2);
+        ctx.fillStyle = '#070b14';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(v.x, v.y, outerR - 3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(253, 224, 71, ${0.75 + 0.25 * pulse})`;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(v.x, v.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  });
+
+  state.animations.shockwaves = state.animations.shockwaves.filter(sw => {
+    ctx.beginPath();
+    ctx.arc(sw.x, sw.y, Math.max(0, sw.radius), 0, Math.PI * 2);
+    ctx.strokeStyle = hexToRgba(sw.color, sw.alpha);
+    ctx.lineWidth = sw.lineWidth;
+    ctx.stroke();
+
+    sw.radius += (sw.maxRadius - sw.radius) * 0.12;
+    sw.alpha -= 0.025;
+    return sw.alpha > 0.02;
+  });
+
+  state.animations.particles = state.animations.particles.filter(pt => {
+    pt.x += pt.vx;
+    pt.y += pt.vy;
+    pt.vx *= 0.94;
+    pt.vy *= 0.94;
+    pt.life++;
+    pt.alpha = Math.max(0, 1 - pt.life / pt.maxLife);
+
+    const radius = pt.size * pt.alpha;
+    if (radius > 0) {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = hexToRgba(pt.color, pt.alpha);
+      ctx.fill();
+    }
+
+    return pt.life < pt.maxLife;
+  });
+
+  state.animations.floatingTexts = state.animations.floatingTexts.filter(ft => {
+    ft.y += ft.vy;
+    ft.life++;
+    ft.alpha = Math.max(0, 1 - ft.life / 55);
+
+    ctx.save();
+    ctx.font = '800 14px "Plus Jakarta Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(15, 23, 42, ${ft.alpha * 0.85})`;
+    ctx.fillText(ft.text, ft.x + 1, ft.y + 1);
+    ctx.fillStyle = hexToRgba(ft.color, ft.alpha);
+    ctx.fillText(ft.text, ft.x, ft.y);
+    ctx.restore();
+
+    return ft.life < 55;
+  });
+
+  ctx.restore();
+
+  state.animations.flyingCards = state.animations.flyingCards.filter(fc => {
+    fc.progress += 0.032;
+    const t = 1 - Math.pow(1 - fc.progress, 3);
+    fc.x = fc.sx + (fc.tx - fc.sx) * t;
+    fc.y = fc.sy + (fc.ty - fc.sy) * t - Math.sin(fc.progress * Math.PI) * 45;
+
+    if (!TERRAIN_META[fc.resource]) return false;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(fc.x, fc.y, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = fc.color;
+    ctx.stroke();
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(TERRAIN_META[fc.resource].icon, fc.x, fc.y);
+    ctx.restore();
+
+    return fc.progress < 1;
+  });
+}
+
+function hexToRgba(hex, alpha) {
+  const clean = hex.replace('#', '');
+  const bigint = parseInt(clean, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// -------------------- 11. CANVAS INTERACTION --------------------
+function screenToWorld(clientX, clientY) {
+  return {
+    x: (clientX - state.camera.x) / state.camera.zoom,
+    y: (clientY - state.camera.y) / state.camera.zoom
+  };
+}
+
+function updateHoverTargets(clientX, clientY) {
+  const pt = screenToWorld(clientX, clientY);
+  state.hoveredVertex = null;
+  state.hoveredEdge = null;
+  state.hoveredHex = null;
+
+  let minVDist = 18;
+  state.vertices.forEach(v => {
+    const d = Math.hypot(v.x - pt.x, v.y - pt.y);
+    if (d < minVDist) {
+      minVDist = d;
+      state.hoveredVertex = v.id;
+    }
+  });
+
+  if (state.hoveredVertex === null) {
+    let minEDist = 16;
+    state.edges.forEach(e => {
+      const d = Math.hypot(e.x - pt.x, e.y - pt.y);
+      if (d < minEDist) {
+        minEDist = d;
+        state.hoveredEdge = e.id;
+      }
+    });
+  }
+
+  let minHDist = state.hexSize * 0.85;
+  state.hexes.forEach(h => {
+    const d = Math.hypot(h.x - pt.x, h.y - pt.y);
+    if (d < minHDist) {
+      minHDist = d;
+      state.hoveredHex = h.id;
+    }
+  });
+}
+
+function handleBoardClick(clientX, clientY) {
+  if (!isLocalTurn()) return;
+  const me = localSeat();
+  const player = state.players[me];
+  updateHoverTargets(clientX, clientY);
+
+  if (state.phase === 'SETUP_SETTLEMENT' && state.hoveredVertex !== null) {
+    if (isValidSettlementVertex(state.vertices[state.hoveredVertex], me, true)) {
+      placeSettlement(state.hoveredVertex, me, true);
+      state.phase = 'SETUP_ROAD';
+      state.buildMode = 'road';
+      updateUI();
+      if (mp.enabled) broadcastGameState(state.phase);
+    }
+    return;
+  }
+
+  if (state.phase === 'SETUP_ROAD' && state.hoveredEdge !== null) {
+    if (isValidRoadEdge(state.edges[state.hoveredEdge], me, true)) {
+      placeRoad(state.hoveredEdge, me, true);
+      advanceTurn();
+    }
+    return;
+  }
+
+  if (state.phase === 'FREE_ROADS' && state.hoveredEdge !== null) {
+    if (isValidRoadEdge(state.edges[state.hoveredEdge], me, false)) {
+      placeRoad(state.hoveredEdge, me, true);
+      state.freeRoadsLeft--;
+      const anyLeft = state.edges.some(e => isValidRoadEdge(e, me, false));
+      if (state.freeRoadsLeft <= 0 || !anyLeft) {
+        state.freeRoadsLeft = 0;
+        state.phase = 'MAIN';
+        state.buildMode = null;
+      }
+      updateUI();
+      if (mp.enabled) broadcastGameState(state.phase);
+    }
+    return;
+  }
+
+  if (state.phase === 'MOVE_ROBBER' && state.hoveredHex !== null) {
+    // The robber must move to a different tile (and respect Friendly Robber)
+    const target = state.hexes[state.hoveredHex];
+    if (isRobberHexAllowed(target, me)) moveRobberToHex(state.hoveredHex);
+    else if (!target.hasRobber) logEvent('🛡️ Friendly Robber: that tile only touches players with 2 or fewer points.');
+    return;
+  }
+
+  if (state.phase === 'MAIN') {
+    if (state.buildMode === 'settlement' && state.hoveredVertex !== null) {
+      if (isValidSettlementVertex(state.vertices[state.hoveredVertex], me, false) && canAfford(player, BUILD_COSTS.settlement)) {
+        state.buildMode = null;
+        placeSettlement(state.hoveredVertex, me, false);
+      }
+    } else if (state.buildMode === 'city' && state.hoveredVertex !== null) {
+      const v = state.vertices[state.hoveredVertex];
+      if (v.owner === me && v.building === 'settlement' && canAfford(player, BUILD_COSTS.city)) {
+        state.buildMode = null;
+        upgradeToCity(state.hoveredVertex, me);
+      }
+    } else if (state.buildMode === 'road' && state.hoveredEdge !== null) {
+      if (isValidRoadEdge(state.edges[state.hoveredEdge], me, false) && canAfford(player, BUILD_COSTS.road)) {
+        state.buildMode = null;
+        placeRoad(state.hoveredEdge, me, false);
+      }
+    }
+  }
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  state.camera.isDragging = true;
+  state.camera.moved = false;
+  state.camera.dragStartX = e.clientX - state.camera.x;
+  state.camera.dragStartY = e.clientY - state.camera.y;
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (state.camera.isDragging) {
+    const nx = e.clientX - state.camera.dragStartX;
+    const ny = e.clientY - state.camera.dragStartY;
+    if (Math.hypot(nx - state.camera.x, ny - state.camera.y) > 4) {
+      state.camera.moved = true;
+    }
+    state.camera.x = nx;
+    state.camera.y = ny;
+  } else {
+    updateHoverTargets(e.clientX, e.clientY);
+  }
+});
+
+window.addEventListener('pointerup', (e) => {
+  if (state.camera.isDragging && !state.camera.moved && e.target === canvas) {
+    handleBoardClick(e.clientX, e.clientY);
+  }
+  state.camera.isDragging = false;
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY < 0 ? 1.09 : 0.91;
+  const newZoom = Math.min(2.1, Math.max(0.45, state.camera.zoom * zoomFactor));
+  state.camera.zoom = newZoom;
+}, { passive: false });
+
+// -------------------- 12. UI RENDERING & MODALS --------------------
+function renderDiceFaces(d1, d2, showTotal = true) {
+  const renderSingle = (el, val) => {
+    el.innerHTML = '';
+    const map = {
+      1: [4],
+      2: [0, 8],
+      3: [0, 4, 8],
+      4: [0, 2, 6, 8],
+      5: [0, 2, 4, 6, 8],
+      6: [0, 2, 3, 5, 6, 8]
+    };
+    const active = map[val] || [];
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement('div');
+      if (active.includes(i)) {
+        cell.className = `pip ${(val === 1 || val === 6) ? 'pip-red' : ''}`;
+      }
+      el.appendChild(cell);
+    }
+  };
+  renderSingle(document.getElementById('die-1'), d1);
+  renderSingle(document.getElementById('die-2'), d2);
+  if (showTotal) document.getElementById('dice-total-badge').textContent = d1 + d2;
+}
+
+function updateUI() {
+  if (!state.players || state.players.length === 0) return;
+  const human = getLocalPlayer() || { id: -1, resources: { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }, devCards: [] };
+  const curr = getCurrentPlayer();
+  if (!curr) return;
+
+  const turnEl = document.getElementById('hud-turn');
+  if (turnEl) turnEl.textContent = state.turn;
+
+  const dotEl = document.getElementById('turn-indicator-dot');
+  if (dotEl) dotEl.style.backgroundColor = curr.color;
+
+  const statusEl = document.getElementById('turn-status-text');
+  if (statusEl) {
+    if (state.phase === 'SETUP_SETTLEMENT') {
+      statusEl.innerHTML = `<strong style="color:${curr.color}">${curr.name}</strong>: Place an initial Settlement`;
+    } else if (state.phase === 'SETUP_ROAD') {
+      statusEl.innerHTML = `<strong style="color:${curr.color}">${curr.name}</strong>: Place a connecting Road`;
+    } else if (state.phase === 'ROLL') {
+      statusEl.innerHTML = `<strong style="color:${curr.color}">${curr.name}</strong>'s Turn — Roll the Dice!`;
+    } else if (state.phase === 'MOVE_ROBBER') {
+      statusEl.innerHTML = `🏴‍☠️ <strong style="color:${curr.color}">${curr.name}</strong>: Click a tile to move the Bandit!`;
+    } else if (state.phase === 'FREE_ROADS') {
+      statusEl.innerHTML = `🛣️ Place ${state.freeRoadsLeft} free Road(s)`;
+    } else if (state.phase === 'MAIN') {
+      if (state.buildMode) {
+        statusEl.innerHTML = `✨ Click a glowing spot to build <strong>${state.buildMode.toUpperCase()}</strong> (or click button again to cancel)`;
+      } else {
+        statusEl.innerHTML = `<strong style="color:${curr.color}">${curr.name}</strong>: Trade, Build, or End Turn`;
+      }
+    }
+  }
+
+  const sb = document.getElementById('player-scoreboard');
+  if (sb) {
+    sb.innerHTML = state.players.map(p => {
+      const vp = calculatePlayerVP(p, p.id === localSeat());
+      const isTurn = p.id === state.currentPlayerIdx;
+      const cardCount = (state.config.hiddenHands && p.id !== localSeat()) ? '?' : getTotalResources(p);
+      return `
+        <div class="glass-panel rounded-2xl px-3 py-1.5 flex items-center gap-2.5 transition ${isTurn ? 'ring-2 ring-amber-400 scale-[1.03]' : 'opacity-80'}">
+          <div class="w-3.5 h-8 rounded-full shadow" style="background:${p.color}"></div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-bold text-white truncate max-w-[85px]">${p.name}</span>
+              ${p.hasLongestRoad ? '<span title="Longest Road (+2 VP)" class="text-xs">👑</span>' : ''}
+              ${p.hasLargestArmy ? '<span title="Largest Army (+2 VP)" class="text-xs">⚔️</span>' : ''}
+            </div>
+            <div class="flex items-center gap-2 text-[10px] text-slate-300 mt-0.5">
+              <span class="font-extrabold text-amber-300">${vp} VP</span>
+              <span>🃏 ${cardCount}</span>
+              <span>🛣️ ${p.longestRoad}</span>
+              <span>⚔️ ${p.knightsPlayed}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const handEl = document.getElementById('resource-hand');
+  if (handEl) {
+    handEl.innerHTML = RESOURCES.map(res => {
+      const meta = TERRAIN_META[res];
+      const count = human.resources[res] || 0;
+      return `
+        <div class="res-card w-16 sm:w-20 h-[88px] sm:h-[104px] rounded-2xl bg-gradient-to-b ${meta.cardBg} border border-white/20 p-2 flex flex-col items-center justify-between shadow-xl cursor-default">
+          <div class="w-full flex items-center justify-between">
+            <span class="text-[9px] font-bold uppercase tracking-wider text-white/80">${meta.resName}</span>
+            <span class="px-1.5 py-0.5 rounded-full bg-slate-950/75 text-xs font-extrabold text-white">${count}</span>
+          </div>
+          <div class="text-2xl sm:text-3xl my-1 drop-shadow">${meta.icon}</div>
+          <div class="w-full h-1 rounded-full bg-white/25"></div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const isMyTurn = isLocalTurn();
+  announceTurnIfNeeded();
+  const isMain = isMyTurn && state.phase === 'MAIN';
+
+  const rollBtn = document.getElementById('btn-roll-dice');
+  if (rollBtn) {
+    rollBtn.disabled = !(isMyTurn && state.phase === 'ROLL') || diceAnimating;
+    rollBtn.classList.toggle('pulse-gold', !rollBtn.disabled);
+  }
+
+  const btnRoad = document.getElementById('btn-build-road');
+  if (btnRoad) {
+    btnRoad.disabled = !(isMain && canAfford(human, BUILD_COSTS.road));
+    btnRoad.classList.toggle('ring-2', state.buildMode === 'road');
+    btnRoad.classList.toggle('ring-amber-400', state.buildMode === 'road');
+  }
+
+  const btnSettle = document.getElementById('btn-build-settlement');
+  if (btnSettle) {
+    btnSettle.disabled = !(isMain && canAfford(human, BUILD_COSTS.settlement));
+    btnSettle.classList.toggle('ring-2', state.buildMode === 'settlement');
+    btnSettle.classList.toggle('ring-amber-400', state.buildMode === 'settlement');
+  }
+
+  const btnCity = document.getElementById('btn-build-city');
+  if (btnCity) {
+    const hasSettlement = state.vertices.some(v => v.owner === human.id && v.building === 'settlement');
+    btnCity.disabled = !(isMain && hasSettlement && canAfford(human, BUILD_COSTS.city));
+    btnCity.classList.toggle('ring-2', state.buildMode === 'city');
+    btnCity.classList.toggle('ring-amber-400', state.buildMode === 'city');
+  }
+
+  const btnBuyDev = document.getElementById('btn-buy-dev');
+  if (btnBuyDev) btnBuyDev.disabled = !(isMain && state.devDeck.length > 0 && canAfford(human, BUILD_COSTS.dev));
+  const btnOpenTrade = document.getElementById('btn-open-trade');
+  if (btnOpenTrade) btnOpenTrade.disabled = !isMain;
+  const btnEndTurn = document.getElementById('btn-end-turn');
+  if (btnEndTurn) btnEndTurn.disabled = !isMain;
+
+  const deckCount = document.getElementById('dev-deck-count');
+  if (deckCount) deckCount.textContent = `${state.devDeck.length} left`;
+
+  const devContainer = document.getElementById('player-dev-cards');
+  if (devContainer) {
+    const unplayed = human.devCards.filter(c => !c.played);
+    if (unplayed.length === 0) {
+      devContainer.innerHTML = `<p class="text-[11px] text-slate-500 italic">No cards held</p>`;
+    } else {
+      devContainer.innerHTML = unplayed.map(c => {
+        const m = DEV_CARD_META[c.type];
+        const playable = isMyTurn && canPlayDevCard(human, c);
+        return `
+          <button ${playable ? `onclick="playDevCard(${c.id})"` : 'disabled'} class="w-full text-left p-1.5 rounded-xl bg-slate-800/90 hover:bg-purple-900/50 border border-purple-500/30 flex items-center justify-between gap-1.5 transition disabled:opacity-60">
+            <span class="text-xs font-semibold text-slate-100 truncate">${m.icon} ${m.name}</span>
+            ${c.type === 'vp' ? '<span class="text-[10px] font-bold text-amber-300">+1 VP</span>' : '<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-600 text-white font-bold">Play</span>'}
+          </button>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function logEvent(htmlMsg) {
+  const logEl = document.getElementById('game-log');
+  if (!logEl) return;
+  const entry = document.createElement('div');
+  entry.className = 'leading-snug border-l-2 border-slate-700 pl-2 py-0.5';
+  entry.innerHTML = htmlMsg;
+  logEl.prepend(entry);
+}
+
+let selectedGive = null;
+let selectedReceive = null;
+
+function openTradeModal() {
+  selectedGive = null;
+  selectedReceive = null;
+  renderTradeModal();
+  document.getElementById('modal-trade').classList.remove('hidden');
+}
+
+function renderTradeModal() {
+  const human = getLocalPlayer();
+  if (!human) return;
+  const giveEl = document.getElementById('trade-give-options');
+  const recEl = document.getElementById('trade-receive-options');
+
+  giveEl.innerHTML = RESOURCES.map(r => {
+    const ratio = getPlayerTradeRatio(human.id, r);
+    const canGive = human.resources[r] >= ratio;
+    const isSel = selectedGive === r;
+    return `
+      <button type="button" ${canGive ? `onclick="selectTradeGive('${r}')"` : 'disabled'} class="p-2 rounded-xl border text-center transition ${isSel ? 'bg-indigo-600 border-white text-white' : 'bg-slate-800 border-slate-700 text-slate-200'} disabled:opacity-35">
+        <div class="text-lg">${TERRAIN_META[r].icon}</div>
+        <div class="text-[10px] font-bold mt-0.5">${ratio}:1</div>
+      </button>
+    `;
+  }).join('');
+
+  recEl.innerHTML = RESOURCES.map(r => {
+    const isSel = selectedReceive === r;
+    return `
+      <button type="button" onclick="selectTradeReceive('${r}')" class="p-2 rounded-xl border text-center transition ${isSel ? 'bg-emerald-600 border-white text-white' : 'bg-slate-800 border-slate-700 text-slate-200'}">
+        <div class="text-lg">${TERRAIN_META[r].icon}</div>
+        <div class="text-[10px] font-bold mt-0.5">+1</div>
+      </button>
+    `;
+  }).join('');
+
+  const summary = document.getElementById('trade-summary');
+  const confirmBtn = document.getElementById('btn-confirm-trade');
+  if (selectedGive && selectedReceive && selectedGive !== selectedReceive) {
+    const ratio = getPlayerTradeRatio(human.id, selectedGive);
+    summary.innerHTML = `Exchange <strong>${ratio} ${TERRAIN_META[selectedGive].resName}</strong> for <strong>1 ${TERRAIN_META[selectedReceive].resName}</strong>`;
+    confirmBtn.disabled = false;
+  } else {
+    summary.textContent = 'Choose a resource to give and a different resource to receive.';
+    confirmBtn.disabled = true;
+  }
+}
+
+window.selectTradeGive = (r) => { selectedGive = r; renderTradeModal(); };
+window.selectTradeReceive = (r) => { selectedReceive = r; renderTradeModal(); };
+window.playDevCard = playDevCard;
+
+function openResourcePicker(title, desc, callback) {
+  document.getElementById('picker-title').textContent = title;
+  document.getElementById('picker-desc').textContent = desc;
+  const container = document.getElementById('picker-buttons');
+  container.innerHTML = '';
+  RESOURCES.forEach(r => {
+    const btn = document.createElement('button');
+    btn.className = 'p-2.5 rounded-xl bg-slate-800 hover:bg-purple-700 border border-slate-700 text-center transition';
+    btn.innerHTML = `<div class="text-xl">${TERRAIN_META[r].icon}</div><div class="text-[10px] font-bold mt-1">${TERRAIN_META[r].resName}</div>`;
+    btn.onclick = () => {
+      document.getElementById('modal-resource-picker').classList.add('hidden');
+      callback(r);
+    };
+    container.appendChild(btn);
+  });
+  document.getElementById('modal-resource-picker').classList.remove('hidden');
+}
+
+function showVictoryModal(winner) {
+  document.getElementById('victory-winner-name').textContent = `${winner.name} Wins!`;
+  document.getElementById('victory-subtitle').textContent = `Achieved ${calculatePlayerVP(winner, true)} Victory Points on Turn ${state.turn}.`;
+
+  const sorted = [...state.players].sort((a, b) => calculatePlayerVP(b, true) - calculatePlayerVP(a, true));
+  document.getElementById('victory-standings').innerHTML = sorted.map((p, idx) => `
+    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-slate-400 text-xs">#${idx + 1}</span>
+        <span class="w-3 h-3 rounded-full" style="background:${p.color}"></span>
+        <span class="font-bold text-sm text-white">${p.name}</span>
+      </div>
+      <span class="font-extrabold text-amber-300 text-sm">${calculatePlayerVP(p, true)} VP</span>
+    </div>
+  `).join('');
+
+  document.getElementById('modal-victory').classList.remove('hidden');
+}
+
+// -------------------- 13. EVENT WIRING & INITIALIZATION --------------------
+// ---- Setup screen: maps, rules, advanced settings ----
+const TIMER_STEPS = [0, 30, 45, 60, 90, 120, 180, 300];
+const RULES = [
+  { key: 'friendlyRobber',  icon: '🛡️', name: 'Friendly Robber',  desc: "Can't rob players on 2 points or fewer" },
+  { key: 'balancedDice',    icon: '🎲', name: 'Balanced Dice',    desc: 'Rolls even out like a shuffled deck' },
+  { key: 'balancedNumbers', icon: '⚖️', name: 'Balanced Numbers', desc: 'No 6s or 8s side by side' },
+  { key: 'hiddenHands',     icon: '🙈', name: 'Hidden Hands',     desc: "Hide rivals' card counts" }
+];
+
+function formatTimer(secs) {
+  if (!secs) return 'Off';
+  return secs < 60 ? `${secs}s` : (secs % 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs / 60}m`);
+}
+
+function drawMapPreview(cnv, def) {
+  const cells = def.cells();
+  const dpr = window.devicePixelRatio || 1;
+  const W = 140, H = 84;
+  cnv.width = W * dpr;
+  cnv.height = H * dpr;
+  const c = cnv.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pts = cells.map(cell => ({ ...cell, ...axialToPixel(cell.q, cell.r, 1) }));
+  const minX = Math.min(...pts.map(p => p.x)) - 1, maxX = Math.max(...pts.map(p => p.x)) + 1;
+  const minY = Math.min(...pts.map(p => p.y)) - 1, maxY = Math.max(...pts.map(p => p.y)) + 1;
+  const size = Math.min((W - 8) / (maxX - minX), (H - 8) / (maxY - minY));
+  const ox = W / 2 - ((minX + maxX) / 2) * size;
+  const oy = H / 2 - ((minY + maxY) / 2) * size;
+  const palette = ['wood', 'sheep', 'wheat', 'brick', 'ore'];
+  pts.forEach((p, i) => {
+    const x = ox + p.x * size, y = oy + p.y * size;
+    c.beginPath();
+    for (let k = 0; k < 6; k++) {
+      const ang = (Math.PI / 180) * (60 * k - 30);
+      const px = x + (size - 0.6) * Math.cos(ang), py = y + (size - 0.6) * Math.sin(ang);
+      if (k === 0) c.moveTo(px, py); else c.lineTo(px, py);
+    }
+    c.closePath();
+    const terrain = p.type === 'water' ? 'water' : p.type === 'desert' ? 'desert'
+      : p.type === 'rich' ? ['ore', 'wheat', 'sheep'][i % 3] : palette[(i * 7 + (p.q * 3) + p.r * 5 + 50) % 5];
+    c.fillStyle = TERRAIN_META[terrain].color1;
+    c.fill();
+    c.lineWidth = 0.8;
+    c.strokeStyle = 'rgba(15, 23, 42, 0.6)';
+    c.stroke();
+  });
+  return cells.filter(x => x.type !== 'water').length;
+}
+
+function renderMapGrid() {
+  const grid = document.getElementById('map-grid');
+  grid.innerHTML = '';
+  MAPS.forEach(def => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.map = def.id;
+    btn.className = 'map-card p-2 rounded-2xl border-2 border-slate-700/80 bg-slate-800/60 text-left flex flex-col gap-1.5';
+    const cnv = document.createElement('canvas');
+    cnv.style.width = '100%';
+    cnv.style.height = '64px';
+    cnv.style.display = 'block';
+    cnv.className = 'rounded-lg bg-slate-950/60';
+    btn.appendChild(cnv);
+    const tiles = drawMapPreview(cnv, def);
+    const info = document.createElement('div');
+    info.innerHTML = `<div class="text-xs font-bold text-white leading-tight">${def.name}</div>
+      <div class="text-[10px] text-slate-400">${def.random ? 'New shape every game' : tiles + ' tiles'} • ${def.players} players</div>`;
+    btn.appendChild(info);
+    btn.addEventListener('click', () => {
+      state.config.mapType = def.id;
+      syncSettingsUI();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function renderRulesGrid() {
+  const grid = document.getElementById('rules-grid');
+  grid.innerHTML = '';
+  RULES.forEach(rule => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.rule = rule.key;
+    btn.className = 'rule-card relative p-3 rounded-2xl border-2 border-slate-700/80 bg-slate-800/60 flex flex-col items-center text-center gap-1';
+    btn.innerHTML = `<span class="rule-check absolute top-2 right-2 w-4 h-4 rounded-full border border-slate-500 text-[10px] font-black flex items-center justify-center">✓</span>
+      <span class="text-2xl">${rule.icon}</span>
+      <span class="text-xs font-bold text-white">${rule.name}</span>
+      <span class="text-[10px] text-slate-400 leading-snug">${rule.desc}</span>`;
+    btn.addEventListener('click', () => {
+      state.config[rule.key] = !state.config[rule.key];
+      syncSettingsUI();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function syncSettingsUI() {
+  const cfg = state.config;
+  document.querySelectorAll('.map-card').forEach(b => b.classList.toggle('selected', b.dataset.map === cfg.mapType));
+  const def = MAP_BY_ID[cfg.mapType];
+  document.getElementById('map-hint').textContent = def ? `${def.name} — best for ${def.players} players` : '';
+  document.querySelectorAll('.rule-card').forEach(b => b.classList.toggle('on', Boolean(cfg[b.dataset.rule])));
+
+  document.getElementById('val-timer').textContent = formatTimer(cfg.turnSeconds);
+  document.getElementById('val-players').textContent = cfg.playerCount;
+  const tIdx = TIMER_STEPS.indexOf(Number(cfg.turnSeconds));
+  document.querySelector('[data-stepper="timer"][data-dir="-1"]').disabled = tIdx <= 0;
+  document.querySelector('[data-stepper="timer"][data-dir="1"]').disabled = tIdx >= TIMER_STEPS.length - 1;
+  document.querySelector('[data-stepper="players"][data-dir="-1"]').disabled = cfg.playerCount <= 2;
+  document.querySelector('[data-stepper="players"][data-dir="1"]').disabled = cfg.playerCount >= 6;
+
+  const vp = document.getElementById('range-vp');
+  vp.value = cfg.vpTarget;
+  document.getElementById('val-vp').textContent = cfg.vpTarget;
+  const disc = document.getElementById('range-discard');
+  disc.value = cfg.discardLimit;
+  document.getElementById('val-discard').textContent = cfg.discardLimit;
+  [vp, disc].forEach(r => {
+    const pct = ((r.value - r.min) / (r.max - r.min)) * 100;
+    r.style.background = `linear-gradient(90deg, #f59e0b ${pct}%, #334155 ${pct}%)`;
+  });
+  try { localStorage.setItem('terrahex_settings', JSON.stringify(cfg)); } catch (_) {}
+  // In a room lobby, the host's choices are shared with everyone
+  if (mp.enabled && mp.isHost && mp.roomCode && mp.backend && document.getElementById('modal-setup').offsetParent !== null) {
+    clearTimeout(syncSettingsUI.pushTimer);
+    syncSettingsUI.pushTimer = setTimeout(() => mp.backend.update(mp.roomCode, { config: state.config }).catch(() => {}), 250);
+  }
+}
+
+document.querySelectorAll('.step-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const dir = Number(btn.dataset.dir);
+    if (btn.dataset.stepper === 'timer') {
+      const idx = Math.max(0, TIMER_STEPS.indexOf(Number(state.config.turnSeconds)));
+      state.config.turnSeconds = TIMER_STEPS[Math.min(TIMER_STEPS.length - 1, Math.max(0, idx + dir))];
+    } else {
+      state.config.playerCount = Math.min(6, Math.max(2, state.config.playerCount + dir));
+    }
+    syncSettingsUI();
+  });
+});
+document.getElementById('range-vp').addEventListener('input', (e) => { state.config.vpTarget = Number(e.target.value); syncSettingsUI(); });
+document.getElementById('range-discard').addEventListener('input', (e) => { state.config.discardLimit = Number(e.target.value); syncSettingsUI(); });
+
+// Restore last-used settings
+try {
+  const saved = JSON.parse(localStorage.getItem('terrahex_settings') || 'null');
+  if (saved && typeof saved === 'object') {
+    const keep = ['mapType', 'playerCount', 'vpTarget', 'discardLimit', 'turnSeconds', 'friendlyRobber', 'balancedDice', 'balancedNumbers', 'hiddenHands', 'playerColor', 'playerName'];
+    keep.forEach(k => { if (saved[k] !== undefined) state.config[k] = saved[k]; });
+    if (!MAP_BY_ID[state.config.mapType]) state.config.mapType = 'classic';
+    state.config.playerName = cleanName(state.config.playerName);
+    document.getElementById('input-player-name').value = state.config.playerName;
+  }
+} catch (_) {}
+renderMapGrid();
+renderRulesGrid();
+syncSettingsUI();
+document.querySelectorAll('.color-swatch').forEach(b => {
+  const on = b.dataset.color === state.config.playerColor;
+  b.classList.toggle('opacity-75', !on);
+  ['ring-2', 'ring-offset-2', 'ring-offset-slate-900', 'ring-white'].forEach(c => b.classList.toggle(c, on));
+});
+document.getElementById('input-player-name').addEventListener('change', (e) => {
+  state.config.playerName = cleanName(e.target.value);
+  syncSettingsUI();
+});
+
+document.querySelectorAll('.color-swatch').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch').forEach(b => {
+      b.classList.remove('ring-2', 'ring-offset-2', 'ring-offset-slate-900', 'ring-white');
+      b.classList.add('opacity-75');
+    });
+    btn.classList.remove('opacity-75');
+    btn.classList.add('ring-2', 'ring-offset-2', 'ring-offset-slate-900', 'ring-white');
+    state.config.playerColor = btn.dataset.color;
+    syncSettingsUI();
+  });
+});
+
+// Mode switch tabs
+document.getElementById('tab-mode-solo').addEventListener('click', () => {
+  document.getElementById('tab-mode-solo').className = 'py-2 px-3 rounded-xl bg-amber-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition';
+  document.getElementById('tab-mode-multi').className = 'py-2 px-3 rounded-xl text-slate-300 hover:text-white font-extrabold text-xs uppercase tracking-wider transition';
+  document.getElementById('multiplayer-lobby-panel').classList.add('hidden');
+  mp.enabled = false;
+  if (mp.unsub) { mp.unsub(); mp.unsub = null; }
+  document.getElementById('map-settings-section').classList.remove('locked');
+  document.getElementById('host-settings-note').classList.add('hidden');
+  const startBtn = document.getElementById('btn-start-game');
+  startBtn.disabled = false;
+  startBtn.textContent = 'LAUNCH EXPEDITION ⚔️';
+});
+
+document.getElementById('tab-mode-multi').addEventListener('click', () => {
+  document.getElementById('tab-mode-multi').className = 'py-2 px-3 rounded-xl bg-indigo-600 text-white font-extrabold text-xs uppercase tracking-wider transition';
+  document.getElementById('tab-mode-solo').className = 'py-2 px-3 rounded-xl text-slate-300 hover:text-white font-extrabold text-xs uppercase tracking-wider transition';
+  document.getElementById('multiplayer-lobby-panel').classList.remove('hidden');
+  if (!mp.roomCode) {
+    setMpBadge('● Checking…', 'warn');
+    initRoomBackend().then(b => {
+      if (mp.roomCode) return;
+      if (b) setMpBadge(`● Ready (${b.label} rooms)`, 'ok');
+      else setMpBadge('✕ Rooms unavailable — open the game via server.js', 'error');
+    });
+  }
+});
+
+document.getElementById('btn-create-room').addEventListener('click', createMultiplayerRoom);
+document.getElementById('btn-join-room').addEventListener('click', () => {
+  const codeInput = document.getElementById('input-room-code');
+  joinMultiplayerRoom(codeInput.value);
+});
+document.getElementById('input-room-code').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') joinMultiplayerRoom(e.currentTarget.value);
+});
+document.getElementById('btn-copy-room-code').addEventListener('click', () => {
+  const code = document.getElementById('display-room-code').textContent;
+  const textArea = document.createElement('textarea');
+  textArea.value = code;
+  document.body.appendChild(textArea);
+  textArea.select();
+  try {
+    document.execCommand('copy');
+    document.getElementById('btn-copy-room-code').textContent = 'Copied!';
+    setTimeout(() => document.getElementById('btn-copy-room-code').textContent = 'Copy', 2000);
+  } catch (err) {
+    console.error('Failed to copy', err);
+  }
+  document.body.removeChild(textArea);
+});
+
+// AMP modal triggers
+document.getElementById('btn-open-amp').addEventListener('click', () => document.getElementById('modal-amp').classList.remove('hidden'));
+document.getElementById('btn-close-amp').addEventListener('click', () => document.getElementById('modal-amp').classList.add('hidden'));
+
+// Download the files as served (not the live, game-modified DOM)
+async function downloadServedFile(path, filename, type) {
+  try {
+    const res = await fetch(path, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const blob = new Blob([await res.text()], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.warn('Download failed:', err);
+    logEvent(`⚠️ Couldn't download ${filename} — open the game from the Terra Hex server and try again.`);
+  }
+}
+
+document.getElementById('btn-download-amp-html').addEventListener('click', () => downloadServedFile('index.html', 'index.html', 'text/html'));
+document.getElementById('btn-download-amp-server').addEventListener('click', () => downloadServedFile('server.js', 'server.js', 'text/javascript'));
+
+document.getElementById('btn-start-game').addEventListener('click', startNewGame);
+document.getElementById('btn-new-game-open').addEventListener('click', () => document.getElementById('modal-setup').classList.remove('hidden'));
+document.getElementById('btn-close-setup').addEventListener('click', () => document.getElementById('modal-setup').classList.add('hidden'));
+document.getElementById('btn-play-again').addEventListener('click', () => {
+  document.getElementById('modal-victory').classList.add('hidden');
+  document.getElementById('modal-setup').classList.remove('hidden');
+});
+
+document.getElementById('btn-roll-dice').addEventListener('click', () => { if (isLocalTurn()) rollDice(); });
+document.getElementById('btn-end-turn').addEventListener('click', () => { if (isLocalTurn() && state.phase === 'MAIN') advanceTurn(); });
+document.getElementById('btn-buy-dev').addEventListener('click', buyDevCard);
+
+['road', 'settlement', 'city'].forEach(mode => {
+  document.getElementById(`btn-build-${mode}`).addEventListener('click', () => {
+    state.buildMode = state.buildMode === mode ? null : mode;
+    updateUI();
+  });
+});
+
+document.getElementById('btn-open-trade').addEventListener('click', openTradeModal);
+document.getElementById('btn-close-trade').addEventListener('click', () => document.getElementById('modal-trade').classList.add('hidden'));
+document.getElementById('btn-confirm-trade').addEventListener('click', () => {
+  if (!selectedGive || !selectedReceive || selectedGive === selectedReceive || !isLocalTurn()) return;
+  const human = getLocalPlayer();
+  const ratio = getPlayerTradeRatio(human.id, selectedGive);
+  if (human.resources[selectedGive] >= ratio) {
+    human.resources[selectedGive] -= ratio;
+    human.resources[selectedReceive] += 1;
+    sfx.collectResource();
+    logEvent(`⚖️ <strong>${human.name}</strong> traded ${ratio} ${selectedGive} for 1 ${selectedReceive}.`);
+    document.getElementById('modal-trade').classList.add('hidden');
+    updateUI();
+    if (mp.enabled) broadcastGameState(state.phase);
+  }
+});
+
+document.getElementById('btn-territory-toggle').addEventListener('click', (e) => {
+  state.showTerritory = !state.showTerritory;
+  e.currentTarget.classList.toggle('text-amber-300', state.showTerritory);
+  e.currentTarget.classList.toggle('text-slate-500', !state.showTerritory);
+});
+
+document.getElementById('btn-center-map').addEventListener('click', centerCamera);
+document.getElementById('btn-rules').addEventListener('click', () => document.getElementById('modal-rules').classList.remove('hidden'));
+document.getElementById('btn-close-rules').addEventListener('click', () => document.getElementById('modal-rules').classList.add('hidden'));
+
+document.getElementById('btn-sound').addEventListener('click', () => {
+  sfx.muted = !sfx.muted;
+  document.getElementById('icon-sound-on').classList.toggle('hidden', sfx.muted);
+  document.getElementById('icon-sound-off').classList.toggle('hidden', !sfx.muted);
+});
+
+window.addEventListener('resize', resizeCanvas);
+
+window.onload = function () {
+  resizeCanvas();
+  renderDiceFaces(3, 4);
+  buildBoard('classic');
+  centerCamera();
+  state.phase = 'LOBBY';
+  logEvent(`Welcome to Terra Hex! Pick a map and launch an expedition.`);
+  
+  // Initialize default players so preview board renders smoothly before launch
+  state.players = [{
+    id: 0,
+    uid: 'preview_user',
+    name: state.config.playerName,
+    color: state.config.playerColor,
+    isAI: false,
+    resources: { wood: 2, brick: 2, sheep: 1, wheat: 1, ore: 1 },
+    devCards: [],
+    knightsPlayed: 0,
+    longestRoad: 2,
+    hasLongestRoad: false,
+    hasLargestArmy: false
+  }, {
+    id: 1,
+    uid: null,
+    name: 'Lady Aurelia (AI)',
+    color: '#3b82f6',
+    isAI: true,
+    resources: { wood: 1, brick: 1, sheep: 1, wheat: 1, ore: 1 },
+    devCards: [],
+    knightsPlayed: 0,
+    longestRoad: 1,
+    hasLongestRoad: false,
+    hasLargestArmy: false
+  }];
+
+  try {
+    const lastRoom = sessionStorage.getItem('terrahex_room');
+    if (lastRoom) document.getElementById('input-room-code').value = lastRoom;
+  } catch (_) {}
+
+  updateUI();
+  requestAnimationFrame(renderLoop);
+};
+</script>
+</body>
+</html>
