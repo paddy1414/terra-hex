@@ -1,13 +1,13 @@
 {
   "name": "terra-hex",
-  "version": "1.1.0",
-  "description": "Hex-tile empire strategy game with AI rivals and self-hosted online rooms",
+  "version": "2.0.0",
+  "description": "Classic hex-island trading and building game with a 3D board, AI rivals and server-checked online rooms",
   "private": true,
+  "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js --port 7779"
+    "start": "node server.js --port 7779",
+    "test": "node --test"
   },
-  "engines": {
-    "node": ">=16"
-  }
+  "engines": { "node": ">=18" }
 }
